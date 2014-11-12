@@ -1,0 +1,6 @@
+.cproject
+.project
+Release
+*.tmp
+*.o
+.settings
