@@ -36,24 +36,38 @@ char tab[12] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 volatile int cur_digit = 0;
 volatile char display[4]; // 4 digits, dot handled separately
 volatile int dot_on = 0;
+volatile int brightness = 7; // range 0-7
+volatile int pwm_iter = 0; // range 0-7
+
+void do_nothing() {
+} // TODO fix later
 
 ISR(TIMER0_OVF_vect) {
-	// turn off digit displayed before (avoids ghosts)
-	PORTB |= (1 << cur_digit);
+	TCNT0 = 220;
 
-	cur_digit++;
+
+	pwm_iter++;
+	if (pwm_iter == 8) {
+		pwm_iter = 0;
+		cur_digit++;
+	}
 	if (cur_digit == 4) {
 		cur_digit = 0;
 	}
 
-	// turn on current digit
-	PORTB &= ~(1 << cur_digit);
+	// turn on current digit, based on pwm current value
+	if (pwm_iter < brightness) {
+		PORTB &= ~(1 << cur_digit);
+	} else {
+		PORTB |= (1 << cur_digit);
+	}
 
 	// select segments
 	PORTA = tab[display[cur_digit]];
 	if (cur_digit == 1 && dot_on)
 		PORTA |= DOT;
 
+	isr_end: do_nothing();
 }
 
 void disp_time(int howlong) {
@@ -118,7 +132,6 @@ int main() {
 	PORTA = 0xaa;
 	PORTB = 0;
 
-
 	ds1307_init();
 	uint8_t year, month, day, hour, minute, second;
 	ds1307_getdate(&year, &month, &day, &hour, &minute, &second);
@@ -127,6 +140,7 @@ int main() {
 		ds1307_setdate(1, 1, 1, 13, 13, 00); // DS won't start if backup battery fails, so this will do the trick
 	}
 
+//	ds1307_setdate(1, 1, 1, 21, 13, 00);
 
 	while (1) {
 		disp_time(50);
