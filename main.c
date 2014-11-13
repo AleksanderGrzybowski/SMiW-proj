@@ -80,6 +80,9 @@ void disp_time(int howlong) {
 		display[2] = minute / 10;
 		display[3] = minute % 10;
 
+		// if first digit is 0, don't display it
+		if (display[0] == 0) display[0] = 11;
+
 		dot_on = (second % 2 == 0); // typical blinking scheme
 		delay_ms(100);
 	}
@@ -140,7 +143,7 @@ int main() {
 		ds1307_setdate(1, 1, 1, 13, 13, 00); // DS won't start if backup battery fails, so this will do the trick
 	}
 
-//	ds1307_setdate(1, 1, 1, 21, 13, 00);
+	ds1307_setdate(1, 1, 1, 3, 13, 00);
 
 	while (1) {
 		disp_time(50);
