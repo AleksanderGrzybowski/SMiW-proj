@@ -176,6 +176,33 @@ void set_time() {
 	ds1307_setdate(dummy, dummy, dummy, hour, minute, 0);
 }
 
+
+uint16_t adc_read() {
+	uint8_t ch = 3;
+	// select the corresponding channel 0~7
+	// ANDing with ’7′ will always keep the value
+	// of ‘ch’ between 0 and 7
+	ch &= 0b00000111;  // AND operation with 7
+	ADMUX = (ADMUX & 0xF8) | ch; // clears the bottom 3 bits before ORing
+
+	// start single convertion
+	// write ’1′ to ADSC
+	ADCSRA |= (1 << ADSC);
+
+	// wait for conversion to complete
+	// ADSC becomes ’0′ again
+	// till then, run loop continuously
+	while (ADCSRA & (1 << ADSC))
+		;
+
+	return (ADCH);
+}
+
+void disp_light() {
+	int res = adc_read();
+	set_display_number(res);
+}
+
 int main() {
 
 	// disable JTAG so we can use all pins
@@ -194,19 +221,24 @@ int main() {
 	DDRB = 0xff;
 	DDRD = 0xff; // display
 
-	// inputs
-	DDRA = 0x00;
-	PORTA = 0xff;
+	// buttons
+	DDRA &= ~(7);
+	PORTA |= 7;
 
-	PORTB = 0;
+	// ADC
+	// AREF = AVcc
+	ADMUX = (1 << REFS0);
+
+	// ADC Enable and prescaler of 128
+	// 16000000/128 = 125000
+	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+	ADMUX |= (1 << ADLAR);
 
 	ds1307_init();
 	uint8_t dummy, hour, minute, second;
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
 	if (hour == 0 && minute == 0 && second == 0)
 		ds1307_setdate(1, 1, 1, 0, 0, 0); // DS won't start if backup battery fails, so this will do the trick
-
-
 
 	while (1) {
 		int i;
@@ -219,6 +251,10 @@ int main() {
 		}
 		for (i = 0; i < 2; ++i) {
 			disp_temp();
+			delay_ms(100);
+		}
+		for (i = 0; i < 20; ++i) {
+			disp_light();
 			delay_ms(100);
 		}
 
