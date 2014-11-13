@@ -46,7 +46,6 @@ void do_nothing() {
 ISR(TIMER0_OVF_vect) {
 	TCNT0 = 220;
 
-
 	pwm_iter++;
 	if (pwm_iter == 8) {
 		pwm_iter = 0;
@@ -68,7 +67,6 @@ ISR(TIMER0_OVF_vect) {
 	if (cur_digit == 1 && dot_on)
 		PORTD |= DOT;
 
-
 	isr_end: do_nothing();
 }
 
@@ -83,7 +81,8 @@ void disp_time(int howlong) {
 		display[3] = minute % 10;
 
 		// if first digit is 0, don't display it
-		if (display[0] == 0) display[0] = 11;
+		if (display[0] == 0)
+			display[0] = 11;
 
 		dot_on = (second % 2 == 0); // typical blinking scheme
 		delay_ms(100);
@@ -99,16 +98,16 @@ void disp_temp(int howlong) {
 
 		_delay_ms(750);
 
-		      /* Odczyt z układu ds18b20, dane zapisywane są w tablicy ds18b20_pad.
-		         Dwie pierwsze pozycje w tablicy to kolejno mniej znaczący bajt i bardziej
-		     znaczący bajt wartość zmierzonej temperatury */
-		       ds18b20_Read(ds18b20_pad);
+		/* Odczyt z układu ds18b20, dane zapisywane są w tablicy ds18b20_pad.
+		 Dwie pierwsze pozycje w tablicy to kolejno mniej znaczący bajt i bardziej
+		 znaczący bajt wartość zmierzonej temperatury */
+		ds18b20_Read(ds18b20_pad);
 
-		      /* Składa dwa bajty wyniku pomiaru w całość. Cztery pierwsze bity mniej
-		         znaczącego bajtu to część ułamkowa wartości temperatury, więc całość
-		         dzielona jest przez 16 */
-		       float temp = ((ds18b20_pad[1] << 8) + ds18b20_pad[0]) / 16.0 ;
-		       itemp = (int) (temp * 10.0);
+		/* Składa dwa bajty wyniku pomiaru w całość. Cztery pierwsze bity mniej
+		 znaczącego bajtu to część ułamkowa wartości temperatury, więc całość
+		 dzielona jest przez 16 */
+		float temp = ((ds18b20_pad[1] << 8) + ds18b20_pad[0]) / 16.0;
+		itemp = (int) (temp * 10.0);
 		// TODO maybe fix these stupid bad readings by
 		// a) repeating a few times and then discarding spurious reads
 		// b) memorize a last measurement and show it if the current one is wrong
@@ -129,6 +128,63 @@ void disp_temp(int howlong) {
 	}
 }
 
+#define DEBOUNCE_DELAY 200 // ms
+void set_time() {
+	int dummy;
+	int hour = 0;
+	int minute = 0;
+
+	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
+	delay_ms(DEBOUNCE_DELAY);
+	while (PINA & 1) { // wait for hours
+		if (!(PINA & 2)) {
+			hour++;
+			if (hour == 24)
+				hour = 0;
+			delay_ms(DEBOUNCE_DELAY);
+		}
+		if (!(PINA & 4)) {
+			hour--;
+			if (hour == -1)
+				hour = 23;
+			delay_ms(DEBOUNCE_DELAY);
+		}
+		display[0] = ((hour / 10) == 0 ? 11 : (hour/10));
+		display[1] = hour % 10;
+		display[2] = minute / 10;
+		display[3] = minute % 10;
+		if (display[0] == 0)
+			display[0] = 11;
+
+	}
+	delay_ms(DEBOUNCE_DELAY);
+
+	while (PINA & 1) { // wait for minutes
+		if (!(PINA & 2)) {
+			minute++;
+			if (minute == 60)
+				minute = 0;
+			delay_ms(DEBOUNCE_DELAY);
+		}
+		if (!(PINA & 4)) {
+			minute--;
+			if (minute == -1)
+				minute = 59;
+			delay_ms(DEBOUNCE_DELAY);
+		}
+		display[0] = ((hour / 10) == 0 ? 11 : (hour/10));
+		display[1] = hour % 10;
+		display[2] = minute / 10;
+		display[3] = minute % 10;
+
+	}
+
+	delay_ms(DEBOUNCE_DELAY);
+
+	ds1307_setdate(dummy, dummy, dummy, hour, minute, 0);
+
+}
+
 int main() {
 
 	// disable JTAG so we can use all pins
@@ -144,9 +200,13 @@ int main() {
 	// not sure if needed
 	sei();
 
-
 	DDRB = 0xff;
-	DDRD = 0xff;
+	DDRD = 0xff; // display
+
+	// inputs
+	DDRA = 0x00;
+	PORTA = 0xFF;
+
 	PORTB = 0;
 
 	ds1307_init();
@@ -160,7 +220,10 @@ int main() {
 	ds1307_setdate(1, 1, 1, 3, 13, 00);
 
 	while (1) {
-		disp_time(50);
-		disp_temp(50);
+		disp_time(1);
+		if (!(PINA & 1)) {
+			set_time();
+		}
+
 	}
 }
