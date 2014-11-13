@@ -33,6 +33,7 @@ char tab[12] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
 		+ G), (B), (0) };
 
+unsigned char ds18b20_pad[9];
 volatile int cur_digit = 0;
 volatile char display[4]; // 4 digits, dot handled separately
 volatile int dot_on = 0;
@@ -90,9 +91,23 @@ void disp_time(int howlong) {
 
 void disp_temp(int howlong) {
 	int i, itemp;
-	for (i = 0; i < howlong; ++i) {
-		volatile int itemp = (int) (DS18B20_temp() * 10);
 
+	for (i = 0; i < howlong; ++i) {
+//		volatile int itemp = (int) (DS18B20_temp() * 10);
+		ds18b20_ConvertT();
+
+		_delay_ms(750);
+
+		      /* Odczyt z układu ds18b20, dane zapisywane są w tablicy ds18b20_pad.
+		         Dwie pierwsze pozycje w tablicy to kolejno mniej znaczący bajt i bardziej
+		     znaczący bajt wartość zmierzonej temperatury */
+		       ds18b20_Read(ds18b20_pad);
+
+		      /* Składa dwa bajty wyniku pomiaru w całość. Cztery pierwsze bity mniej
+		         znaczącego bajtu to część ułamkowa wartości temperatury, więc całość
+		         dzielona jest przez 16 */
+		       float temp = ((ds18b20_pad[1] << 8) + ds18b20_pad[0]) / 16.0 ;
+		       itemp = (int) (temp * 10.0);
 		// TODO maybe fix these stupid bad readings by
 		// a) repeating a few times and then discarding spurious reads
 		// b) memorize a last measurement and show it if the current one is wrong
@@ -146,7 +161,7 @@ int main() {
 	ds1307_setdate(1, 1, 1, 3, 13, 00);
 
 	while (1) {
-		disp_time(50);
-		disp_temp(2);
+//		disp_time(50);
+		disp_temp(50);
 	}
 }
