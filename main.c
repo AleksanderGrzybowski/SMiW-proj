@@ -64,9 +64,10 @@ ISR(TIMER0_OVF_vect) {
 	}
 
 	// select segments
-	PORTA = tab[display[cur_digit]];
+	PORTD = tab[display[cur_digit]];
 	if (cur_digit == 1 && dot_on)
-		PORTA |= DOT;
+		PORTD |= DOT;
+
 
 	isr_end: do_nothing();
 }
@@ -143,11 +144,9 @@ int main() {
 	// not sure if needed
 	sei();
 
-	DDRA = 0xff;
-	DDRB = 0xff;
 
-	PORTA = 0xff;
-	PORTA = 0xaa;
+	DDRB = 0xff;
+	DDRD = 0xff;
 	PORTB = 0;
 
 	ds1307_init();
@@ -161,7 +160,7 @@ int main() {
 	ds1307_setdate(1, 1, 1, 3, 13, 00);
 
 	while (1) {
-//		disp_time(50);
+		disp_time(50);
 		disp_temp(50);
 	}
 }
