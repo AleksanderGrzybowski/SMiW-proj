@@ -27,12 +27,16 @@ void delay_us(uint16_t count) {
 #define C 4
 #define B 2
 #define A 1
-char tab[12] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
+char tab[15] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G + C + D), (F + G + B + C), (A + F + G + C + D), (A + F + G + E + D
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
-		+ G), (B), (0) };
+		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
+		(D + E + F + G) };
 #define DASH 10
 #define EMPTY_DIGIT 11
+#define LETTER_S 12
+#define LETTER_E 13
+#define LETTER_T 14
 
 volatile char display[4]; // 4 digits, dot handled below
 volatile int dot_on = 0;
@@ -115,10 +119,13 @@ void set_time() {
 	int hour = 0;
 	int minute = 0;
 
+	set_display_each(LETTER_S, LETTER_E, LETTER_T, EMPTY_DIGIT, 0);
+	delay_ms(500);
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
-	delay_ms(DEBOUNCE_DELAY);
+
 
 	while (PINA & 1) { // wait for hours
+		delay_ms(DEBOUNCE_DELAY);
 		if (!(PINA & 2)) {
 			hour++;
 			if (hour == 24)
@@ -194,13 +201,14 @@ int main() {
 		for (i = 0; i < 10; ++i) {
 			disp_time();
 			delay_ms(100);
+			if (!(PINA & 1)) {
+				set_time();
+			}
 		}
 		for (i = 0; i < 2; ++i) {
 			disp_temp();
 			delay_ms(100);
 		}
-		if (!(PINA & 1)) {
-			set_time();
-		}
+
 	}
 }
