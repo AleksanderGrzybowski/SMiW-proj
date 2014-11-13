@@ -7,7 +7,6 @@
 #ifndef DS18B20_H
 #define DS18B20_H
 
-/* DS18B20 przyłączony do portu  PC2 AVRa  */
 #define SET_ONEWIRE_PORT     PORTC  |=  _BV(2)
 #define CLR_ONEWIRE_PORT     PORTC  &= ~_BV(2)
 #define IS_SET_ONEWIRE_PIN   PINC   &   _BV(2)
