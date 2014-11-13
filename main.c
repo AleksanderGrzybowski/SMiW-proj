@@ -87,6 +87,17 @@ void set_display_all(int left, int right, int dot) {
 	set_display_each(dig0, dig1, dig2, dig3, dot);
 }
 
+void set_display_number(int number) {
+	int d3 = number % 10;
+	number /= 10;
+	int d2 = number % 10;
+	number /= 10;
+	int d1 = number % 10;
+	number /= 10;
+	int d0 = number % 10;
+	set_display_each(d0, d1, d2, d3, 0);
+}
+
 void disp_time() {
 	uint8_t year, month, day, hour, minute, second;
 	ds1307_getdate(&year, &month, &day, &hour, &minute, &second);
@@ -122,7 +133,6 @@ void set_time() {
 	set_display_each(LETTER_S, LETTER_E, LETTER_T, EMPTY_DIGIT, 0);
 	delay_ms(500);
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
-
 
 	while (PINA & 1) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
@@ -195,6 +205,8 @@ int main() {
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
 	if (hour == 0 && minute == 0 && second == 0)
 		ds1307_setdate(1, 1, 1, 0, 0, 0); // DS won't start if backup battery fails, so this will do the trick
+
+
 
 	while (1) {
 		int i;
