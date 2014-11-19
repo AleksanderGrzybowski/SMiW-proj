@@ -27,16 +27,19 @@ void delay_us(uint16_t count) {
 #define C 4
 #define B 2
 #define A 1
-char tab[15] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
+char tab[18] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G + C + D), (F + G + B + C), (A + F + G + C + D), (A + F + G + E + D
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
 		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
-		(D + E + F + G) };
+		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A+E+F+G) };
 #define DASH 10
 #define EMPTY_DIGIT 11
 #define LETTER_S 12
 #define LETTER_E 13
 #define LETTER_T 14
+#define LETTER_P 15
+#define LETTER_M 16
+#define LETTER_F 17
 
 volatile char display[4]; // 4 digits, dot handled below
 volatile int dot_on = 0;
@@ -176,7 +179,6 @@ void set_time() {
 	ds1307_setdate(dummy, dummy, dummy, hour, minute, 0);
 }
 
-
 uint16_t adc_read() {
 	uint8_t ch = 3;
 	// select the corresponding channel 0~7
@@ -224,6 +226,10 @@ int main() {
 	// buttons
 	DDRA &= ~(7);
 	PORTA |= 7;
+	DDRA &= ~(1 << PA4);
+	PORTA |= (1 << PA4);
+	DDRA &= ~(1 << PA5);
+	PORTA |= (1 << PA5);
 
 	// ADC
 	// AREF = AVcc
@@ -234,29 +240,40 @@ int main() {
 	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 	ADMUX |= (1 << ADLAR);
 
+	set_display_number(1234);
+	delay_ms(500);
+
 	ds1307_init();
 	uint8_t dummy, hour, minute, second;
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
 	if (hour == 0 && minute == 0 && second == 0)
-		ds1307_setdate(1, 1, 1, 0, 0, 0); // DS won't start if backup battery fails, so this will do the trick
+		ds1307_setdate(1, 1, 1, 12, 34, 56); // DS won't start if backup battery fails, so this will do the trick
 
 	while (1) {
-		int i;
-		for (i = 0; i < 10; ++i) {
+		int i, j;
+		for (i = 0; i < 20; ++i) {
 			disp_time();
 			delay_ms(100);
 			if (!(PINA & 1)) {
 				set_time();
 			}
-		}
-		for (i = 0; i < 2; ++i) {
-			disp_temp();
-			delay_ms(100);
-		}
-		for (i = 0; i < 20; ++i) {
-			disp_light();
-			delay_ms(100);
-		}
+			if (!(PINA & 16)) {
+				set_display_each(LETTER_T, LETTER_E, LETTER_M, LETTER_P, 0);
+				delay_ms(1000);
+				for (j = 0; j < 10; ++j) {
+					disp_temp();
+					delay_ms(100);
+				}
+			}
+			if (!(PINA & 32)) {
+				set_display_each(LETTER_F, 0, LETTER_T, 0, 0);
+				delay_ms(1000);
+				for (j = 0; j < 7; ++j) {
+					disp_light();
+					delay_ms(300);
+				}
+			}
 
+		}
 	}
 }
