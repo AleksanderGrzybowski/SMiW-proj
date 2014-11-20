@@ -205,6 +205,15 @@ void disp_light() {
 	set_display_number(res);
 }
 
+void regulate_brightness() {
+	int reading = adc_read();
+
+	if (reading >= 254)
+		brightness = 2;
+	else
+		brightness = 7;
+}
+
 int main() {
 
 	// disable JTAG so we can use all pins
@@ -254,6 +263,7 @@ int main() {
 		for (i = 0; i < 20; ++i) {
 			disp_time();
 			delay_ms(100);
+			regulate_brightness();
 			if (!(PINA & 1)) {
 				set_time();
 			}
