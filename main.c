@@ -20,6 +20,35 @@ void delay_us(uint16_t count) {
 	}
 }
 
+//////////////////////////////////////
+#define CONF_PHOTO_ADC_CHANNEL 3
+
+#define CONF_BUTTON_SETTIME_PORT PORTA
+#define CONF_BUTTON_SETTIME_DDR  DDRA
+#define CONF_BUTTON_SETTIME_PIN  PINA
+#define CONF_BUTTON_SETTIME_NUM  0
+
+#define CONF_BUTTON_DOWN_PORT PORTA
+#define CONF_BUTTON_DOWN_DDR  DDRA
+#define CONF_BUTTON_DOWN_PIN  PINA
+#define CONF_BUTTON_DOWN_NUM  1
+
+#define CONF_BUTTON_UP_PORT PORTA
+#define CONF_BUTTON_UP_DDR  DDRA
+#define CONF_BUTTON_UP_PIN  PINA
+#define CONF_BUTTON_UP_NUM  2
+
+#define CONF_BUTTON_DISPTEMP_PORT PORTA
+#define CONF_BUTTON_DISPTEMP_DDR  DDRA
+#define CONF_BUTTON_DISPTEMP_PIN  PINA
+#define CONF_BUTTON_DISPTEMP_NUM  4
+
+#define CONF_BUTTON_DISPLIGHT_PORT PORTA
+#define CONF_BUTTON_DISPLIGHT_DDR  DDRA
+#define CONF_BUTTON_DISPLIGHT_PIN  PINA
+#define CONF_BUTTON_DISPLIGHT_NUM  5
+
+/////////////////////////////
 // Constants decribing segments on 7-seg display.
 // Segments are connected to PORTD.
 // anodes (->mosfets) are connected do low part of PORTB.
@@ -35,7 +64,7 @@ char tab[18] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G + C + D), (F + G + B + C), (A + F + G + C + D), (A + F + G + E + D
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
 		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
-		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A+E+F+G) };
+		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G) };
 #define DASH 10
 #define EMPTY_DIGIT 11
 #define LETTER_S 12
@@ -185,7 +214,7 @@ void set_time() {
 
 // from the internet
 uint16_t adc_read() {
-	uint8_t ch = 3;
+	uint8_t ch = CONF_PHOTO_ADC_CHANNEL;
 	// select the corresponding channel 0~7
 	// ANDing with ’7′ will always keep the value
 	// of ‘ch’ between 0 and 7
@@ -221,6 +250,11 @@ void regulate_brightness() {
 
 int main() {
 
+	// set all pins as inputs with pullups
+	// so accidental short to vcc/gnd won't destroy uC
+	DDRA = DDRB = DDRC = DDRD = 0x00;
+	PORTA = PORTB = PORTC = PORTD = 0xff;
+
 	// disable JTAG so we can use all pins
 	MCUCSR |= (1 << JTD);
 	MCUCSR |= (1 << JTD);
@@ -234,29 +268,38 @@ int main() {
 	// not sure if needed
 	sei();
 
-	DDRB = 0xff;
-	DDRD = 0xff; // display
+	// display
+	DDRB |= 0x0f; // common anodes
+	DDRD = 0xff; // segments
 
 	// buttons
-	DDRA &= ~(7);
-	PORTA |= 7;
-	DDRA &= ~(1 << PA4);
-	PORTA |= (1 << PA4);
-	DDRA &= ~(1 << PA5);
-	PORTA |= (1 << PA5);
+	CONF_BUTTON_SETTIME_DDR &= ~_BV(CONF_BUTTON_SETTIME_NUM);
+	CONF_BUTTON_SETTIME_PORT |= _BV(CONF_BUTTON_SETTIME_NUM);
+
+	CONF_BUTTON_UP_DDR &= ~_BV(CONF_BUTTON_UP_NUM);
+	CONF_BUTTON_UP_PORT |= _BV(CONF_BUTTON_UP_NUM);
+
+	CONF_BUTTON_DOWN_DDR &= ~_BV(CONF_BUTTON_DOWN_NUM);
+	CONF_BUTTON_DOWN_PORT |= _BV(CONF_BUTTON_DOWN_NUM);
+
+	CONF_BUTTON_DISPTEMP_DDR &= ~_BV(CONF_BUTTON_DISPTEMP_NUM);
+	CONF_BUTTON_DISPTEMP_PORT |= _BV(CONF_BUTTON_DISPTEMP_NUM);
+
+	CONF_BUTTON_DISPLIGHT_DDR &= ~_BV(CONF_BUTTON_DISPLIGHT_NUM);
+	CONF_BUTTON_DISPLIGHT_PORT |= _BV(CONF_BUTTON_DISPLIGHT_NUM);
 
 	// ADC
 	// AREF = AVcc
 	ADMUX = (1 << REFS0);
-
-	// ADC Enable and prescaler of 128
-	// 16000000/128 = 125000
+	// Enable and prescaler of 128
 	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 	ADMUX |= (1 << ADLAR);
 
+	// display "init"
 	set_display_each_digit(1, LETTER_M, 1, LETTER_T, 1);
 	delay_ms(1500);
 
+	// start RTC and check if it ticks
 	ds1307_init();
 	uint8_t dummy, hour, minute, second;
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
@@ -275,7 +318,8 @@ int main() {
 				set_time();
 			}
 			if (!(PINA & 16)) {
-				set_display_each_digit(LETTER_T, LETTER_E, LETTER_M, LETTER_P, 0);
+				set_display_each_digit(LETTER_T, LETTER_E, LETTER_M, LETTER_P,
+						0);
 				delay_ms(1000);
 				for (j = 0; j < 10; ++j) {
 					disp_temp();
