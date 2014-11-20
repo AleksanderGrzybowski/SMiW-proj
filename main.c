@@ -260,8 +260,10 @@ int main() {
 	ds1307_init();
 	uint8_t dummy, hour, minute, second;
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
-	if (hour == 0 && minute == 0 && second == 0)
-		ds1307_setdate(1, 1, 1, 12, 34, 56); // DS won't start if backup battery fails, so this will do the trick
+	if (hour == 0 && minute == 0 && second == 0) {
+		ds1307_setdate(1, 1, 1, 0, 0, 0); // DS won't start if backup battery fails, so this will do the trick
+		delay_ms(2000);
+	}
 
 	while (1) {
 		int i, j;
