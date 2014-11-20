@@ -240,8 +240,8 @@ int main() {
 	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 	ADMUX |= (1 << ADLAR);
 
-	set_display_number(1234);
-	delay_ms(500);
+	set_display_each(1, LETTER_M, 1, LETTER_T, 1);
+	delay_ms(1500);
 
 	ds1307_init();
 	uint8_t dummy, hour, minute, second;
