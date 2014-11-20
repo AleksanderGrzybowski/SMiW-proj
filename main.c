@@ -20,7 +20,7 @@ void delay_us(uint16_t count) {
 	}
 }
 
-//////////////////////////////////////
+////////////////////////////////////////////////////////
 #define CONF_PHOTO_ADC_CHANNEL 3
 
 #define CONF_BUTTON_SETTIME_PORT PORTA
@@ -48,7 +48,9 @@ void delay_us(uint16_t count) {
 #define CONF_BUTTON_DISPLIGHT_PIN  PINA
 #define CONF_BUTTON_DISPLIGHT_NUM  5
 
-/////////////////////////////
+/////////////////////////////////////////////////////
+
+
 // Constants decribing segments on 7-seg display.
 // Segments are connected to PORTD.
 // anodes (->mosfets) are connected do low part of PORTB.
@@ -170,15 +172,15 @@ void set_time() {
 	delay_ms(500);
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
 
-	while (PINA & 1) { // wait for hours
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
-		if (!(PINA & 2)) {
+		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			hour++;
 			if (hour == 24)
 				hour = 0;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-		if (!(PINA & 4)) {
+		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			hour--;
 			if (hour == -1)
 				hour = 23;
@@ -192,14 +194,14 @@ void set_time() {
 	}
 	delay_ms(DEBOUNCE_DELAY);
 
-	while (PINA & 1) { // wait for minutes
-		if (!(PINA & 2)) {
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for minutes
+		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			minute++;
 			if (minute == 60)
 				minute = 0;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-		if (!(PINA & 4)) {
+		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			minute--;
 			if (minute == -1)
 				minute = 59;
@@ -308,32 +310,41 @@ int main() {
 		delay_ms(2000);
 	}
 
+// all times in ms
+#define UPDATE_INTERVAL_TIME 100
+#define UPDATE_INTERVAL_TEMP 100 // delay already in temp_read()
+#define REPEATS_TEMP 10 // delay already in temp_read()
+#define UPDATE_INTERVAL_LIGHT 300
+#define REPEATS_LIGHT 7 // delay already in temp_read()
+
 	while (1) {
-		int i, j;
-		for (i = 0; i < 20; ++i) {
-			disp_time();
-			delay_ms(100);
-			regulate_brightness();
-			if (!(PINA & 1)) {
-				set_time();
-			}
-			if (!(PINA & 16)) {
-				set_display_each_digit(LETTER_T, LETTER_E, LETTER_M, LETTER_P,
-						0);
-				delay_ms(1000);
-				for (j = 0; j < 10; ++j) {
-					disp_temp();
-					delay_ms(100);
-				}
-			}
-			if (!(PINA & 32)) {
-				set_display_each_digit(LETTER_F, 0, LETTER_T, 0, 0);
-				delay_ms(1000);
-				for (j = 0; j < 7; ++j) {
-					disp_light();
-					delay_ms(300);
-				}
+		int j;
+
+		disp_time();
+		delay_ms(UPDATE_INTERVAL_TIME);
+		regulate_brightness();
+
+		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
+			set_time();
+		}
+
+		if (!(CONF_BUTTON_DISPTEMP_PIN & _BV(CONF_BUTTON_DISPTEMP_NUM))) {
+			set_display_each_digit(LETTER_T, LETTER_E, LETTER_M, LETTER_P, 0);
+			delay_ms(1000);
+			for (j = 0; j < REPEATS_TEMP; ++j) {
+				disp_temp();
+				delay_ms(UPDATE_INTERVAL_TEMP);
 			}
 		}
+
+		if (!(CONF_BUTTON_DISPLIGHT_PIN & _BV(CONF_BUTTON_DISPLIGHT_NUM))) {
+			set_display_each_digit(LETTER_F, 0, LETTER_T, 0, 0);
+			delay_ms(1000);
+			for (j = 0; j < REPEATS_LIGHT; ++j) {
+				disp_light();
+				delay_ms(UPDATE_INTERVAL_LIGHT);
+			}
+		}
+
 	}
 }
