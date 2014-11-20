@@ -1,4 +1,5 @@
-#define F_CPU 16000000UL
+#define F_CPU 16000000UL // 16 MHz clock
+
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
@@ -19,6 +20,9 @@ void delay_us(uint16_t count) {
 	}
 }
 
+// Constants decribing segments on 7-seg display.
+// Segments are connected to PORTD.
+// anodes (->mosfets) are connected do low part of PORTB.
 #define DOT 128
 #define G 64
 #define F 32
@@ -70,11 +74,11 @@ ISR(TIMER0_OVF_vect) {
 
 	// select segments
 	PORTD = tab[display[cur_digit]];
-	if (cur_digit == 1 && dot_on)
+	if (cur_digit == 1 && dot_on) // and dot if there is
 		PORTD |= DOT;
 }
 
-void set_display_each(int dig0, int dig1, int dig2, int dig3, int dot) {
+void set_display_each_digit(int dig0, int dig1, int dig2, int dig3, int dot) {
 	display[0] = dig0;
 	display[1] = dig1;
 	display[2] = dig2;
@@ -82,15 +86,15 @@ void set_display_each(int dig0, int dig1, int dig2, int dig3, int dot) {
 	dot_on = dot;
 }
 
-void set_display_all(int left, int right, int dot) {
-	int dig0 = ((left / 10) == 0 ? 11 : (left / 10)); // without leading '0'
+void set_display_two_digits(int left, int right, int dot) {
+	int dig0 = ((left / 10) == 0 ? EMPTY_DIGIT : (left / 10)); // without leading '0'
 	int dig1 = left % 10;
 	int dig2 = right / 10;
 	int dig3 = right % 10;
-	set_display_each(dig0, dig1, dig2, dig3, dot);
+	set_display_each_digit(dig0, dig1, dig2, dig3, dot);
 }
 
-void set_display_number(int number) {
+void set_display_whole_number(int number) {
 	int d3 = number % 10;
 	number /= 10;
 	int d2 = number % 10;
@@ -98,21 +102,21 @@ void set_display_number(int number) {
 	int d1 = number % 10;
 	number /= 10;
 	int d0 = number % 10;
-	set_display_each(d0, d1, d2, d3, 0);
+	set_display_each_digit(d0, d1, d2, d3, 0);
 }
 
 void disp_time() {
 	uint8_t year, month, day, hour, minute, second;
 	ds1307_getdate(&year, &month, &day, &hour, &minute, &second);
 
-	set_display_all(hour, minute, (second % 2 == 0));
+	set_display_two_digits(hour, minute, (second % 2 == 0));
 }
 
 void disp_temp() {
 	unsigned char ds18b20_pad[9];
 
 	ds18b20_ConvertT();
-	_delay_ms(750);
+	_delay_ms(750); // shows garbage without it, read the docs!!!
 	ds18b20_Read(ds18b20_pad);
 
 	float temp = ((ds18b20_pad[1] << 8) + ds18b20_pad[0]) / 16.0;
@@ -124,7 +128,7 @@ void disp_temp() {
 	itemp /= 10;
 	int d0 = itemp % 10;
 
-	set_display_each(d0, d1, d2, DASH, 1);
+	set_display_each_digit(d0, d1, d2, DASH, 1);
 }
 
 #define DEBOUNCE_DELAY 200 // ms
@@ -133,7 +137,7 @@ void set_time() {
 	int hour = 0;
 	int minute = 0;
 
-	set_display_each(LETTER_S, LETTER_E, LETTER_T, EMPTY_DIGIT, 0);
+	set_display_each_digit(LETTER_S, LETTER_E, LETTER_T, EMPTY_DIGIT, 0);
 	delay_ms(500);
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
 
@@ -152,7 +156,7 @@ void set_time() {
 			delay_ms(DEBOUNCE_DELAY);
 		}
 
-		set_display_all(hour, minute, 1);
+		set_display_two_digits(hour, minute, 1);
 		if (display[0] == 0)
 			display[0] = 11;
 
@@ -172,13 +176,14 @@ void set_time() {
 				minute = 59;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-		set_display_all(hour, minute, 1);
+		set_display_two_digits(hour, minute, 1);
 	}
 
 	delay_ms(DEBOUNCE_DELAY);
 	ds1307_setdate(dummy, dummy, dummy, hour, minute, 0);
 }
 
+// from the internet
 uint16_t adc_read() {
 	uint8_t ch = 3;
 	// select the corresponding channel 0~7
@@ -202,7 +207,7 @@ uint16_t adc_read() {
 
 void disp_light() {
 	int res = adc_read();
-	set_display_number(res);
+	set_display_whole_number(res);
 }
 
 void regulate_brightness() {
@@ -249,7 +254,7 @@ int main() {
 	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 	ADMUX |= (1 << ADLAR);
 
-	set_display_each(1, LETTER_M, 1, LETTER_T, 1);
+	set_display_each_digit(1, LETTER_M, 1, LETTER_T, 1);
 	delay_ms(1500);
 
 	ds1307_init();
@@ -268,7 +273,7 @@ int main() {
 				set_time();
 			}
 			if (!(PINA & 16)) {
-				set_display_each(LETTER_T, LETTER_E, LETTER_M, LETTER_P, 0);
+				set_display_each_digit(LETTER_T, LETTER_E, LETTER_M, LETTER_P, 0);
 				delay_ms(1000);
 				for (j = 0; j < 10; ++j) {
 					disp_temp();
@@ -276,14 +281,13 @@ int main() {
 				}
 			}
 			if (!(PINA & 32)) {
-				set_display_each(LETTER_F, 0, LETTER_T, 0, 0);
+				set_display_each_digit(LETTER_F, 0, LETTER_T, 0, 0);
 				delay_ms(1000);
 				for (j = 0; j < 7; ++j) {
 					disp_light();
 					delay_ms(300);
 				}
 			}
-
 		}
 	}
 }
