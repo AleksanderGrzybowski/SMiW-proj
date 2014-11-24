@@ -21,7 +21,7 @@ void delay_us(uint16_t count) {
 }
 
 ////////////////////////////////////////////////////////
-#define CONF_PHOTO_ADC_CHANNEL 3
+#define CONF_PHOTO_ADC_CHANNEL 7
 
 #define CONF_BUTTON_SETTIME_PORT PORTA
 #define CONF_BUTTON_SETTIME_DDR  DDRA
@@ -41,12 +41,25 @@ void delay_us(uint16_t count) {
 #define CONF_BUTTON_DISPTEMP_PORT PORTA
 #define CONF_BUTTON_DISPTEMP_DDR  DDRA
 #define CONF_BUTTON_DISPTEMP_PIN  PINA
-#define CONF_BUTTON_DISPTEMP_NUM  4
+#define CONF_BUTTON_DISPTEMP_NUM  3
 
-#define CONF_BUTTON_DISPLIGHT_PORT PORTA
-#define CONF_BUTTON_DISPLIGHT_DDR  DDRA
-#define CONF_BUTTON_DISPLIGHT_PIN  PINA
-#define CONF_BUTTON_DISPLIGHT_NUM  5
+#define CONF_BUTTON_SETALARM_PORT PORTA
+#define CONF_BUTTON_SETALARM_DDR  DDRA
+#define CONF_BUTTON_SETALARM_PIN  PINA
+#define CONF_BUTTON_SETALARM_NUM  4
+
+#define CONF_JUMPER_BRIG_PORT PORTA
+#define CONF_JUMPER_BRIG_DDR DDRA
+#define CONF_JUMPER_BRIG_PIN  PINA
+#define CONF_JUMPER_BRIG_NUM  5
+
+#define CONF_JUMPER_TEMP_PORT PORTA
+#define CONF_JUMPER_TEMP_DDR DDRA
+#define CONF_JUMPER_TEMP_PIN  PINA
+#define CONF_JUMPER_TEMP_NUM  6
+
+
+
 
 /////////////////////////////////////////////////////
 
@@ -163,14 +176,8 @@ void disp_temp() {
 }
 
 #define DEBOUNCE_DELAY 200 // ms
-void set_time() {
-	int dummy;
-	int hour = 0;
-	int minute = 0;
+void get_time_from_user(int hour, int minute, int* out_hour, int* out_minute) {
 
-	set_display_each_digit(LETTER_S, LETTER_E, LETTER_T, EMPTY_DIGIT, 0);
-	delay_ms(500);
-	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
 
 	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
@@ -211,7 +218,24 @@ void set_time() {
 	}
 
 	delay_ms(DEBOUNCE_DELAY);
-	ds1307_setdate(dummy, dummy, dummy, hour, minute, 0);
+
+	*out_hour = hour;
+	*out_minute = minute;
+
+}
+
+void set_time() {
+	int dummy;
+	int hour = 0;
+	int minute = 0;
+
+	set_display_each_digit(LETTER_S, LETTER_E, LETTER_T, EMPTY_DIGIT, 0);
+	delay_ms(500);
+	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
+
+	int new_hour, new_minute;
+	get_time_from_user(hour, minute, &new_hour, &new_minute);
+	ds1307_setdate(dummy, dummy, dummy, new_hour, new_minute, 0);
 }
 
 // from the internet
@@ -287,8 +311,8 @@ int main() {
 	CONF_BUTTON_DISPTEMP_DDR &= ~_BV(CONF_BUTTON_DISPTEMP_NUM);
 	CONF_BUTTON_DISPTEMP_PORT |= _BV(CONF_BUTTON_DISPTEMP_NUM);
 
-	CONF_BUTTON_DISPLIGHT_DDR &= ~_BV(CONF_BUTTON_DISPLIGHT_NUM);
-	CONF_BUTTON_DISPLIGHT_PORT |= _BV(CONF_BUTTON_DISPLIGHT_NUM);
+	CONF_BUTTON_SETALARM_DDR &= ~_BV(CONF_BUTTON_SETALARM_NUM);
+	CONF_BUTTON_SETALARM_PORT |= _BV(CONF_BUTTON_SETALARM_NUM);
 
 	// ADC
 	// AREF = AVcc
@@ -337,14 +361,7 @@ int main() {
 			}
 		}
 
-		if (!(CONF_BUTTON_DISPLIGHT_PIN & _BV(CONF_BUTTON_DISPLIGHT_NUM))) {
-			set_display_each_digit(LETTER_F, 0, LETTER_T, 0, 0);
-			delay_ms(1000);
-			for (j = 0; j < REPEATS_LIGHT; ++j) {
-				disp_light();
-				delay_ms(UPDATE_INTERVAL_LIGHT);
-			}
-		}
+
 
 	}
 }
