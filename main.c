@@ -265,7 +265,7 @@ void set_alarm() {
 }
 
 void ring_alarm() {
-	while(CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM)) {
+	while (CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM)) {
 		CONF_BUZZER_PORT ^= _BV(CONF_BUZZER_NUM);
 		delay_ms(1000);
 	}
@@ -276,8 +276,6 @@ void ring_alarm() {
 	alarm_is_set = 0;
 
 }
-
-
 
 // from the internet
 uint16_t adc_read() {
@@ -307,6 +305,13 @@ void disp_light() {
 }
 
 void regulate_brightness() {
+	int should_be_full_brig = (CONF_JUMPER_BRIG_PIN
+			& (1 << CONF_JUMPER_BRIG_NUM)) != 0;
+	if (should_be_full_brig) {
+		brightness = 7;
+		return;
+	}
+
 	int reading = adc_read();
 
 	if (reading >= 254)
@@ -403,7 +408,10 @@ int main() {
 	while (1) {
 		int j;
 
+		// test place
 
+
+		// test end
 
 		disp_time();
 		delay_ms(UPDATE_INTERVAL_TIME);
@@ -426,7 +434,6 @@ int main() {
 		}
 
 		check_and_alarm();
-
 
 	}
 }
