@@ -92,15 +92,17 @@ char tab[19] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_F 17
 #define LETTER_A 18
 
+// variables for alarm
 volatile int alarm_is_set = 0;
-volatile int alarm_hour = 0;
-volatile int alarm_minute = 0;
+volatile uint8_t alarm_hour = 0;
+volatile uint8_t alarm_minute = 0;
 
+// variables for display
 volatile char display[4]; // 4 digits, dot handled below
 volatile int dot_on = 0;
 volatile int brightness = 7; // range 0-7
 
-// for PWM and switching digits
+// variables for PWM and switching digits
 volatile int cur_digit = 0;
 volatile int pwm_iter = 0; // range 0-7
 
@@ -157,8 +159,8 @@ void set_display_whole_number(int number) {
 }
 
 void disp_time() {
-	uint8_t year, month, day, hour, minute, second;
-	ds1307_getdate(&year, &month, &day, &hour, &minute, &second);
+	uint8_t hour, minute, second, dummy;
+	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
 
 	set_display_two_digits(hour, minute, (second % 2 == 0));
 }
@@ -183,7 +185,7 @@ void disp_temp() {
 }
 
 #define DEBOUNCE_DELAY 200 // ms
-void get_time_from_user(int hour, int minute, int* out_hour, int* out_minute) {
+void get_time_from_user(int hour, int minute, uint8_t* out_hour, uint8_t* out_minute) {
 
 	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
@@ -201,9 +203,6 @@ void get_time_from_user(int hour, int minute, int* out_hour, int* out_minute) {
 		}
 
 		set_display_two_digits(hour, minute, 1);
-		if (display[0] == 0)
-			display[0] = 11;
-
 	}
 	delay_ms(DEBOUNCE_DELAY);
 
@@ -231,9 +230,9 @@ void get_time_from_user(int hour, int minute, int* out_hour, int* out_minute) {
 }
 
 void set_time() {
-	int dummy;
-	int hour = 0;
-	int minute = 0;
+	uint8_t dummy;
+	uint8_t hour = 0;
+	uint8_t minute = 0;
 
 	set_display_each_digit(LETTER_S, LETTER_E, LETTER_T, EMPTY_DIGIT, 0);
 	delay_ms(500);
@@ -244,10 +243,10 @@ void set_time() {
 	ds1307_setdate(dummy, dummy, dummy, new_hour, new_minute, 0);
 }
 
-void set_alarm() {
-	int dummy;
-	int hour = 0;
-	int minute = 0;
+void set_or_turn_off_alarm() {
+	uint8_t dummy;
+	uint8_t hour = 0;
+	uint8_t minute = 0;
 
 	if (alarm_is_set) { // then turn it off
 		set_display_each_digit(0, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
@@ -421,7 +420,7 @@ int main() {
 			set_time();
 		}
 		if (!(CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM))) {
-			set_alarm();
+			set_or_turn_off_alarm();
 		}
 
 		if (!(CONF_BUTTON_DISPTEMP_PIN & _BV(CONF_BUTTON_DISPTEMP_NUM))) {
@@ -436,9 +435,9 @@ int main() {
 		check_and_alarm();
 
 		int should_be_displaying_temp = (CONF_JUMPER_TEMP_PIN
-					& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
+				& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
 		temp_disp_counter++;
-		if (temp_disp_counter == 60 && should_be_displaying_temp) {
+		if (temp_disp_counter > 20 && should_be_displaying_temp) {
 			temp_disp_counter = 0;
 			int j;
 			for (j = 0; j < 10; ++j) {
