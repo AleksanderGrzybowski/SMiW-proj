@@ -58,11 +58,12 @@ void delay_us(uint16_t count) {
 #define CONF_JUMPER_TEMP_PIN  PINA
 #define CONF_JUMPER_TEMP_NUM  6
 
-
-
+#define CONF_BUZZER_PORT PORTC
+#define CONF_BUZZER_DDR DDRC
+#define CONF_BUZZER_PIN  PINC
+#define CONF_BUZZER_NUM  3
 
 /////////////////////////////////////////////////////
-
 
 // Constants decribing segments on 7-seg display.
 // Segments are connected to PORTD.
@@ -75,11 +76,12 @@ void delay_us(uint16_t count) {
 #define C 4
 #define B 2
 #define A 1
-char tab[18] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
+char tab[19] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G + C + D), (F + G + B + C), (A + F + G + C + D), (A + F + G + E + D
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
 		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
-		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G) };
+		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G), (A
+				+ B + C + E + F + G) };
 #define DASH 10
 #define EMPTY_DIGIT 11
 #define LETTER_S 12
@@ -88,6 +90,11 @@ char tab[18] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_P 15
 #define LETTER_M 16
 #define LETTER_F 17
+#define LETTER_A 18
+
+volatile int alarm_is_set = 0;
+volatile int alarm_hour = 0;
+volatile int alarm_minute = 0;
 
 volatile char display[4]; // 4 digits, dot handled below
 volatile int dot_on = 0;
@@ -178,7 +185,6 @@ void disp_temp() {
 #define DEBOUNCE_DELAY 200 // ms
 void get_time_from_user(int hour, int minute, int* out_hour, int* out_minute) {
 
-
 	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
@@ -238,6 +244,41 @@ void set_time() {
 	ds1307_setdate(dummy, dummy, dummy, new_hour, new_minute, 0);
 }
 
+void set_alarm() {
+	int dummy;
+	int hour = 0;
+	int minute = 0;
+
+	if (alarm_is_set) { // then turn it off
+		set_display_each_digit(0, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
+		delay_ms(1000);
+		alarm_is_set = 0;
+	} else { // turn it on
+		alarm_is_set = 1;
+		set_display_each_digit(LETTER_A, 1, LETTER_A, EMPTY_DIGIT, 0);
+		delay_ms(1000);
+		ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
+		get_time_from_user(hour, minute, &alarm_hour, &alarm_minute);
+		set_display_each_digit(0, LETTER_M, EMPTY_DIGIT, EMPTY_DIGIT, 0);
+		delay_ms(1000);
+	}
+}
+
+void ring_alarm() {
+	while(CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM)) {
+		CONF_BUZZER_PORT ^= _BV(CONF_BUZZER_NUM);
+		delay_ms(1000);
+	}
+	CONF_BUZZER_PORT |= _BV(CONF_BUZZER_NUM);
+	alarm_is_set = 0;
+	set_display_each_digit(0, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
+	delay_ms(1000);
+	alarm_is_set = 0;
+
+}
+
+
+
 // from the internet
 uint16_t adc_read() {
 	uint8_t ch = CONF_PHOTO_ADC_CHANNEL;
@@ -274,6 +315,14 @@ void regulate_brightness() {
 		brightness = 7;
 }
 
+void check_and_alarm() {
+	uint8_t year, month, day, hour, minute, second;
+	ds1307_getdate(&year, &month, &day, &hour, &minute, &second);
+
+	if (minute == alarm_minute && hour == alarm_hour && alarm_is_set == 1)
+		ring_alarm();
+}
+
 int main() {
 
 	// set all pins as inputs with pullups
@@ -298,6 +347,10 @@ int main() {
 	DDRB |= 0x0f; // common anodes
 	DDRD = 0xff; // segments
 
+	// buzzer
+	CONF_BUZZER_DDR |= _BV(CONF_BUZZER_NUM);
+	CONF_BUZZER_PORT |= _BV(CONF_BUZZER_NUM);
+
 	// buttons
 	CONF_BUTTON_SETTIME_DDR &= ~_BV(CONF_BUTTON_SETTIME_NUM);
 	CONF_BUTTON_SETTIME_PORT |= _BV(CONF_BUTTON_SETTIME_NUM);
@@ -313,6 +366,12 @@ int main() {
 
 	CONF_BUTTON_SETALARM_DDR &= ~_BV(CONF_BUTTON_SETALARM_NUM);
 	CONF_BUTTON_SETALARM_PORT |= _BV(CONF_BUTTON_SETALARM_NUM);
+
+	CONF_JUMPER_BRIG_DDR &= ~_BV(CONF_JUMPER_BRIG_NUM);
+	CONF_JUMPER_BRIG_PORT |= _BV(CONF_JUMPER_BRIG_NUM);
+
+	CONF_JUMPER_TEMP_DDR &= ~_BV(CONF_JUMPER_TEMP_NUM);
+	CONF_JUMPER_TEMP_PORT |= _BV(CONF_JUMPER_TEMP_NUM);
 
 	// ADC
 	// AREF = AVcc
@@ -344,12 +403,17 @@ int main() {
 	while (1) {
 		int j;
 
+
+
 		disp_time();
 		delay_ms(UPDATE_INTERVAL_TIME);
 		regulate_brightness();
 
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
+		}
+		if (!(CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM))) {
+			set_alarm();
 		}
 
 		if (!(CONF_BUTTON_DISPTEMP_PIN & _BV(CONF_BUTTON_DISPTEMP_NUM))) {
@@ -361,6 +425,7 @@ int main() {
 			}
 		}
 
+		check_and_alarm();
 
 
 	}
