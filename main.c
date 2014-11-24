@@ -405,11 +405,11 @@ int main() {
 #define UPDATE_INTERVAL_LIGHT 300
 #define REPEATS_LIGHT 7 // delay already in temp_read()
 
+	int temp_disp_counter = 0;
 	while (1) {
 		int j;
 
 		// test place
-
 
 		// test end
 
@@ -434,6 +434,18 @@ int main() {
 		}
 
 		check_and_alarm();
+
+		int should_be_displaying_temp = (CONF_JUMPER_TEMP_PIN
+					& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
+		temp_disp_counter++;
+		if (temp_disp_counter == 60 && should_be_displaying_temp) {
+			temp_disp_counter = 0;
+			int j;
+			for (j = 0; j < 10; ++j) {
+				disp_temp();
+				delay_ms(UPDATE_INTERVAL_TEMP);
+			}
+		}
 
 	}
 }
