@@ -144,6 +144,16 @@ void set_display_two_digits(int left, int right, int dot) {
 	int dig1 = left % 10;
 	int dig2 = right / 10;
 	int dig3 = right % 10;
+
+	if (left == -1) {
+		dig0 = EMPTY_DIGIT;
+		dig1 = EMPTY_DIGIT;
+	}
+	if (right == -1) {
+		dig2 = EMPTY_DIGIT;
+		dig3 = EMPTY_DIGIT;
+	}
+
 	set_display_each_digit(dig0, dig1, dig2, dig3, dot);
 }
 
@@ -185,7 +195,10 @@ void disp_temp() {
 }
 
 #define DEBOUNCE_DELAY 200 // ms
-void get_time_from_user(int hour, int minute, uint8_t* out_hour, uint8_t* out_minute) {
+void get_time_from_user(int hour, int minute, uint8_t* out_hour,
+		uint8_t* out_minute) {
+
+	int flip = 0;
 
 	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
@@ -201,12 +214,16 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour, uint8_t* out_mi
 				hour = 23;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-
-		set_display_two_digits(hour, minute, 1);
+		if (flip)
+			set_display_two_digits(hour, minute, 1);
+		else
+			set_display_two_digits(-1, minute, 1);
+		flip = !flip;
 	}
 	delay_ms(DEBOUNCE_DELAY);
 
 	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for minutes
+		delay_ms(DEBOUNCE_DELAY);
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			minute++;
 			if (minute == 60)
@@ -219,7 +236,11 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour, uint8_t* out_mi
 				minute = 59;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-		set_display_two_digits(hour, minute, 1);
+		if (flip)
+			set_display_two_digits(hour, minute, 1);
+		else
+			set_display_two_digits(hour, -1, 1);
+		flip = !flip;
 	}
 
 	delay_ms(DEBOUNCE_DELAY);
