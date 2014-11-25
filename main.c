@@ -67,7 +67,7 @@ void delay_us(uint16_t count) {
 
 // Constants decribing segments on 7-seg display.
 // Segments are connected to PORTD.
-// anodes (->mosfets) are connected do low part of PORTB.
+// anodes (->transistors P-type) are connected to low part of PORTB.
 #define DOT 128
 #define G 64
 #define F 32
@@ -76,12 +76,14 @@ void delay_us(uint16_t count) {
 #define C 4
 #define B 2
 #define A 1
-char tab[19] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
+char tab[20] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G + C + D), (F + G + B + C), (A + F + G + C + D), (A + F + G + E + D
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
 		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
 		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G), (A
-				+ B + C + E + F + G) };
+				+ B + C + E + F + G), (D + E + F) };
+#define LETTER_I 1
+#define LETTER_O 0
 #define DASH 10
 #define EMPTY_DIGIT 11
 #define LETTER_S 12
@@ -89,8 +91,10 @@ char tab[19] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_T 14
 #define LETTER_P 15
 #define LETTER_M 16
+#define LETTER_N 16
 #define LETTER_F 17
 #define LETTER_A 18
+#define LETTER_L 19
 
 // variables for alarm
 volatile int alarm_is_set = 0;
@@ -107,7 +111,7 @@ volatile int cur_digit = 0;
 volatile int pwm_iter = 0; // range 0-7
 
 ISR(TIMER0_OVF_vect) {
-	TCNT0 = 220; // regulate speed
+	TCNT0 = 220; // regulate speed of multiplexing
 
 	pwm_iter++;
 	if (pwm_iter == 8) {
@@ -139,19 +143,23 @@ void set_display_each_digit(int dig0, int dig1, int dig2, int dig3, int dot) {
 	dot_on = dot;
 }
 
+// if given -1, it will display empty digit (no segments lit)
 void set_display_two_digits(int left, int right, int dot) {
-	int dig0 = ((left / 10) == 0 ? EMPTY_DIGIT : (left / 10)); // without leading '0'
-	int dig1 = left % 10;
-	int dig2 = right / 10;
-	int dig3 = right % 10;
-
+	int dig0, dig1, dig2, dig3;
 	if (left == -1) {
 		dig0 = EMPTY_DIGIT;
 		dig1 = EMPTY_DIGIT;
+	} else {
+		dig0 = ((left / 10) == 0 ? EMPTY_DIGIT : (left / 10)); // without leading '0'
+		dig1 = left % 10;
 	}
+
 	if (right == -1) {
 		dig2 = EMPTY_DIGIT;
 		dig3 = EMPTY_DIGIT;
+	} else {
+		dig2 = right / 10;
+		dig3 = right % 10;
 	}
 
 	set_display_each_digit(dig0, dig1, dig2, dig3, dot);
@@ -265,7 +273,7 @@ void set_time() {
 
 	int new_hour, new_minute;
 	get_time_from_user(hour, minute, &new_hour, &new_minute);
-	ds1307_setdate(dummy, dummy, dummy, new_hour, new_minute, 0);
+	ds1307_setdate(1, 1, 1, new_hour, new_minute, 0);
 }
 
 void set_or_turn_off_alarm() {
@@ -274,16 +282,16 @@ void set_or_turn_off_alarm() {
 	uint8_t minute = 0;
 
 	if (alarm_is_set) { // then turn it off
-		set_display_each_digit(0, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
+		set_display_each_digit(LETTER_O, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
 		delay_ms(1000);
 		alarm_is_set = 0;
 	} else { // turn it on
 		alarm_is_set = 1;
-		set_display_each_digit(LETTER_A, 1, LETTER_A, EMPTY_DIGIT, 0);
+		set_display_each_digit(LETTER_A, LETTER_L, LETTER_A, EMPTY_DIGIT, 0);
 		delay_ms(1000);
 		ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
 		get_time_from_user(hour, minute, &alarm_hour, &alarm_minute);
-		set_display_each_digit(0, LETTER_M, EMPTY_DIGIT, EMPTY_DIGIT, 0);
+		set_display_each_digit(LETTER_O, LETTER_M, EMPTY_DIGIT, EMPTY_DIGIT, 0);
 		delay_ms(1000);
 	}
 }
@@ -291,11 +299,11 @@ void set_or_turn_off_alarm() {
 void ring_alarm() {
 	while (CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM)) {
 		CONF_BUZZER_PORT ^= _BV(CONF_BUZZER_NUM);
-		delay_ms(1000);
+		delay_ms(200);
 	}
 	CONF_BUZZER_PORT |= _BV(CONF_BUZZER_NUM);
 	alarm_is_set = 0;
-	set_display_each_digit(0, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
+	set_display_each_digit(LETTER_O, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
 	delay_ms(1000);
 	alarm_is_set = 0;
 
@@ -410,7 +418,7 @@ int main() {
 	ADMUX |= (1 << ADLAR);
 
 	// display "init"
-	set_display_each_digit(1, LETTER_M, 1, LETTER_T, 1);
+	set_display_each_digit(LETTER_I, LETTER_N, LETTER_I, LETTER_T, 1);
 	delay_ms(1500);
 
 	// start RTC and check if it ticks
@@ -434,7 +442,8 @@ int main() {
 		int j;
 
 		// test place
-
+//		disp_light();
+//		continue;
 		// test end
 
 		disp_time();
@@ -453,6 +462,7 @@ int main() {
 			delay_ms(1000);
 			for (j = 0; j < REPEATS_TEMP; ++j) {
 				disp_temp();
+				regulate_brightness();
 				delay_ms(UPDATE_INTERVAL_TEMP);
 			}
 		}
@@ -467,6 +477,7 @@ int main() {
 			int j;
 			for (j = 0; j < 10; ++j) {
 				disp_temp();
+				regulate_brightness();
 				delay_ms(UPDATE_INTERVAL_TEMP);
 			}
 		}
