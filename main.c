@@ -194,7 +194,7 @@ void disp_temp() {
 	set_display_each_digit(d0, d1, d2, DASH, 1);
 }
 
-#define DEBOUNCE_DELAY 200 // ms
+#define DEBOUNCE_DELAY 100 // ms
 void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 		uint8_t* out_minute) {
 
@@ -214,11 +214,13 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 				hour = 23;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-		if (flip)
+		if (flip >= 2)
 			set_display_two_digits(hour, minute, 1);
 		else
 			set_display_two_digits(-1, minute, 1);
-		flip = !flip;
+		flip++;
+		if (flip == 4)
+			flip = 0;
 	}
 	delay_ms(DEBOUNCE_DELAY);
 
@@ -236,11 +238,13 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 				minute = 59;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-		if (flip)
+		if (flip >= 2)
 			set_display_two_digits(hour, minute, 1);
 		else
 			set_display_two_digits(hour, -1, 1);
-		flip = !flip;
+		flip++;
+		if (flip == 4)
+			flip = 0;
 	}
 
 	delay_ms(DEBOUNCE_DELAY);
