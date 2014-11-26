@@ -301,7 +301,7 @@ void ring_alarm() {
 		CONF_BUZZER_PORT ^= _BV(CONF_BUZZER_NUM);
 		delay_ms(200);
 	}
-	CONF_BUZZER_PORT |= _BV(CONF_BUZZER_NUM);
+	CONF_BUZZER_PORT &= ~_BV(CONF_BUZZER_NUM);
 	alarm_is_set = 0;
 	set_display_each_digit(LETTER_O, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
 	delay_ms(1000);
@@ -386,7 +386,8 @@ int main() {
 
 	// buzzer
 	CONF_BUZZER_DDR |= _BV(CONF_BUZZER_NUM);
-	CONF_BUZZER_PORT |= _BV(CONF_BUZZER_NUM);
+	CONF_BUZZER_PORT &= ~_BV(CONF_BUZZER_NUM);
+
 
 	// buttons
 	CONF_BUTTON_SETTIME_DDR &= ~_BV(CONF_BUTTON_SETTIME_NUM);
