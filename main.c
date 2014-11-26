@@ -433,10 +433,8 @@ int main() {
 
 // all times in ms
 #define UPDATE_INTERVAL_TIME 100
-#define UPDATE_INTERVAL_TEMP 100 // delay already in temp_read()
+#define UPDATE_INTERVAL_TEMP 100 // delay of 750 ms already in temp_read()
 #define REPEATS_TEMP 10 // delay already in temp_read()
-#define UPDATE_INTERVAL_LIGHT 300
-#define REPEATS_LIGHT 7 // delay already in temp_read()
 
 	int temp_disp_counter = 0;
 	while (1) {
@@ -473,10 +471,10 @@ int main() {
 		int should_be_displaying_temp = (CONF_JUMPER_TEMP_PIN
 				& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
 		temp_disp_counter++;
-		if (temp_disp_counter > 20 && should_be_displaying_temp) {
+		if (temp_disp_counter > 40 && should_be_displaying_temp) {
 			temp_disp_counter = 0;
 			int j;
-			for (j = 0; j < 10; ++j) {
+			for (j = 0; j < 3; ++j) {
 				disp_temp();
 				regulate_brightness();
 				delay_ms(UPDATE_INTERVAL_TEMP);
