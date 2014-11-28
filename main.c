@@ -14,12 +14,6 @@ void delay_ms(uint16_t count) {
 	}
 }
 
-void delay_us(uint16_t count) {
-	while (count--) {
-		_delay_us(1);
-	}
-}
-
 ////////////////////////////////////////////////////////
 #define CONF_PHOTO_ADC_CHANNEL 7
 
