@@ -291,6 +291,7 @@ void set_or_turn_off_alarm() {
 }
 
 void ring_alarm() {
+	disp_time();
 	while (CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM)) {
 		CONF_BUZZER_PORT ^= _BV(CONF_BUZZER_NUM);
 		delay_ms(200);
@@ -382,7 +383,6 @@ int main() {
 	CONF_BUZZER_DDR |= _BV(CONF_BUZZER_NUM);
 	CONF_BUZZER_PORT &= ~_BV(CONF_BUZZER_NUM);
 
-
 	// buttons
 	CONF_BUTTON_SETTIME_DDR &= ~_BV(CONF_BUTTON_SETTIME_NUM);
 	CONF_BUTTON_SETTIME_PORT |= _BV(CONF_BUTTON_SETTIME_NUM);
@@ -427,53 +427,57 @@ int main() {
 
 // all times in ms
 #define UPDATE_INTERVAL_TIME 100
-#define UPDATE_INTERVAL_TEMP 100 // delay of 750 ms already in temp_read()
-#define REPEATS_TEMP 10 // delay already in temp_read()
+#define UPDATE_INTERVAL_TEMP 100 // + 750 ms in temp_read()
+#define REPEATS_TIME 40 // delay already in temp_read()
+#define REPEATS_TEMP 3 // delay already in temp_read()
 
-	int temp_disp_counter = 0;
+	int counter = 0;
+
 	while (1) {
-		int j;
 
 		// test place
 //		disp_light();
 //		continue;
 		// test end
 
-		disp_time();
+		int should_be_displaying_temp = (CONF_JUMPER_TEMP_PIN
+				& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
+
+		if (counter < REPEATS_TIME)
+			disp_time();
+		else if ((counter < (REPEATS_TEMP + REPEATS_TIME)) && should_be_displaying_temp)
+			disp_temp();
+		else
+			counter = -1;
+
+		counter++;
 		delay_ms(UPDATE_INTERVAL_TIME);
+
 		regulate_brightness();
+		check_and_alarm();
 
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
+			counter = 0;
 		}
 		if (!(CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM))) {
 			set_or_turn_off_alarm();
+			counter = 0;
 		}
 
 		if (!(CONF_BUTTON_DISPTEMP_PIN & _BV(CONF_BUTTON_DISPTEMP_NUM))) {
 			set_display_each_digit(LETTER_T, LETTER_E, LETTER_M, LETTER_P, 0);
 			delay_ms(1000);
+			int j;
 			for (j = 0; j < REPEATS_TEMP; ++j) {
 				disp_temp();
 				regulate_brightness();
 				delay_ms(UPDATE_INTERVAL_TEMP);
 			}
+			counter = 0;
 		}
 
-		check_and_alarm();
 
-		int should_be_displaying_temp = (CONF_JUMPER_TEMP_PIN
-				& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
-		temp_disp_counter++;
-		if (temp_disp_counter > 40 && should_be_displaying_temp) {
-			temp_disp_counter = 0;
-			int j;
-			for (j = 0; j < 3; ++j) {
-				disp_temp();
-				regulate_brightness();
-				delay_ms(UPDATE_INTERVAL_TEMP);
-			}
-		}
 
 	}
 }
