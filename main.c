@@ -8,12 +8,14 @@
 #include "ds1307.h"
 #include "ds18b20.h"
 
+/* Function to do simple active blocking delay */
 void delay_ms(uint16_t count) {
 	while (count--) {
 		_delay_ms(1);
 	}
 }
 
+/* Config */
 ////////////////////////////////////////////////////////
 #define CONF_PHOTO_ADC_CHANNEL 7
 
@@ -59,9 +61,11 @@ void delay_ms(uint16_t count) {
 
 /////////////////////////////////////////////////////
 
-// Constants decribing segments on 7-seg display.
-// Segments are connected to PORTD.
-// anodes (->transistors P-type) are connected to low part of PORTB.
+/*
+ * Constants decribing segments on 7-seg display.
+ * Segments are connected to whole PORTD (this port is hardcoded in ISR) through N-type transistors.
+ * anodes (-> transistors P-type) are connected to low part (0..3) of PORTB.
+ */
 #define DOT 128
 #define G 64
 #define F 32
@@ -90,22 +94,27 @@ char tab[20] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_A 18
 #define LETTER_L 19
 
-// variables for alarm
+/* variables for alarm */
 volatile int alarm_is_set = 0;
 volatile uint8_t alarm_hour = 0;
 volatile uint8_t alarm_minute = 0;
 
-// variables for display
+/* variables for display */
 volatile char display[4]; // 4 digits, dot handled below
 volatile int dot_on = 0;
-volatile int brightness = 7; // range 0-7
+volatile int brightness = 7; // range <0-7>
 
-// variables for PWM and switching digits
-volatile int cur_digit = 0;
-volatile int pwm_iter = 0; // range 0-7
+/* variables for PWM and switching digits */
+volatile int cur_digit = 0; // current displayed digit
+volatile int pwm_iter = 0; // current PWM iteration in range <0..7>
 
+/* ISR used to multiplex 7-seg 4-digit display */
 ISR(TIMER0_OVF_vect) {
-	TCNT0 = 220; // regulate speed of multiplexing
+
+	/* regulate speed of multiplexing, less = slower
+	 * this is way simpler than fiddling with prescalers :)
+	 */
+	TCNT0 = 220;
 
 	pwm_iter++;
 	if (pwm_iter == 8) {
@@ -116,26 +125,25 @@ ISR(TIMER0_OVF_vect) {
 		cur_digit = 0;
 	}
 
-	// turn off all
+	/* turn off all digits to avoid ghosting */
 	PORTB |= 15;
 	PORTD = 0x00;
 
-
-
-	// turn on/off current digit, based on pwm current value
+	/* turn on/off current digit, based on pwm current value */
 	if (pwm_iter < brightness) {
 		PORTB &= ~(1 << cur_digit);
 	} else {
 		PORTB |= (1 << cur_digit);
 	}
 
-
-	// select segments
+	/* select segments */
 	PORTD = tab[display[cur_digit]];
-	if (cur_digit == 1 && dot_on) // and dot if there is
+	/* and dot if there is */
+	if (cur_digit == 1 && dot_on)
 		PORTD |= DOT;
 }
 
+/* set display's digits, each digit separately, useful for debugging and used by other funcs */
 void set_display_each_digit(int dig0, int dig1, int dig2, int dig3, int dot) {
 	display[0] = dig0;
 	display[1] = dig1;
@@ -144,7 +152,9 @@ void set_display_each_digit(int dig0, int dig1, int dig2, int dig3, int dot) {
 	dot_on = dot;
 }
 
-// if given -1, it will display empty digit (no segments lit)
+/* set display's digits, two numbers in range <0..99> without leading '0'
+ * if given -1, it will display empty digit (no segments lit)
+ */
 void set_display_two_digits(int left, int right, int dot) {
 	int dig0, dig1, dig2, dig3;
 	if (left == -1) {
@@ -166,6 +176,7 @@ void set_display_two_digits(int left, int right, int dot) {
 	set_display_each_digit(dig0, dig1, dig2, dig3, dot);
 }
 
+/* set display's digits, one number in range <0.9999>, great for debug */
 void set_display_whole_number(int number) {
 	int d3 = number % 10;
 	number /= 10;
@@ -177,6 +188,7 @@ void set_display_whole_number(int number) {
 	set_display_each_digit(d0, d1, d2, d3, 0);
 }
 
+/* display current time */
 void disp_time() {
 	uint8_t hour, minute, second, dummy;
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
@@ -184,6 +196,7 @@ void disp_time() {
 	set_display_two_digits(hour, minute, (second % 2 == 1));
 }
 
+/* display current temperature */
 void disp_temp() {
 	unsigned char ds18b20_pad[9];
 
@@ -192,6 +205,10 @@ void disp_temp() {
 	ds18b20_Read(ds18b20_pad);
 
 	float temp = ((ds18b20_pad[1] << 8) + ds18b20_pad[0]) / 16.0;
+
+	/* we want 1 decimal place after the dot, so the simplest way
+	 * to do that is multiply the reading (as float) by 10 and show it as 3-digit integer
+	 */
 	int itemp = (int) (temp * 10.0);
 
 	int d2 = itemp % 10;
@@ -203,6 +220,7 @@ void disp_temp() {
 	set_display_each_digit(d0, d1, d2, DASH, 1);
 }
 
+/* ask user to input time */
 #define DEBOUNCE_DELAY 100 // ms
 void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 		uint8_t* out_minute) {
@@ -260,9 +278,9 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 
 	*out_hour = hour;
 	*out_minute = minute;
-
 }
 
+/* ask user for time and set it as current time */
 void set_time() {
 	uint8_t dummy;
 	uint8_t hour = 0;
@@ -277,6 +295,7 @@ void set_time() {
 	ds1307_setdate(1, 1, 1, new_hour, new_minute, 0);
 }
 
+/* if alarm is on, turn it off, otherwise, turn it on */
 void set_or_turn_off_alarm() {
 	uint8_t dummy;
 	uint8_t hour = 0;
@@ -291,12 +310,15 @@ void set_or_turn_off_alarm() {
 		set_display_each_digit(LETTER_A, LETTER_L, LETTER_A, EMPTY_DIGIT, 0);
 		delay_ms(1000);
 		ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
-		get_time_from_user(hour, minute, &alarm_hour, &alarm_minute);
+		get_time_from_user(hour, minute, &alarm_hour, &alarm_minute); // modify global state!
 		set_display_each_digit(LETTER_O, LETTER_M, EMPTY_DIGIT, EMPTY_DIGIT, 0);
 		delay_ms(1000);
 	}
 }
 
+/* make some noise while waiting for the user to turn off the alarm
+ * using OFF button
+ */
 void ring_alarm() {
 	disp_time();
 	while (CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM)) {
@@ -308,10 +330,11 @@ void ring_alarm() {
 	set_display_each_digit(LETTER_O, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
 	delay_ms(1000);
 	alarm_is_set = 0;
-
 }
 
-// from the internet
+/* function to read light reading from ADC, copied from the internet
+ * comments below are not mine :)
+ */
 uint16_t adc_read() {
 	uint8_t ch = CONF_PHOTO_ADC_CHANNEL;
 	// select the corresponding channel 0~7
@@ -333,11 +356,13 @@ uint16_t adc_read() {
 	return (ADCH);
 }
 
+/* display light intensity reading, not used in production */
 void disp_light() {
 	int res = adc_read();
 	set_display_whole_number(res);
 }
 
+/* read light intensity and set PWM threshold value accordingly */
 void regulate_brightness() {
 	int should_be_full_brig = (CONF_JUMPER_BRIG_PIN
 			& (1 << CONF_JUMPER_BRIG_NUM)) != 0;
@@ -354,6 +379,9 @@ void regulate_brightness() {
 		brightness = 7;
 }
 
+/* check if there should be an alarm ringing
+ * if it is the case, ring
+ */
 void check_and_alarm() {
 	uint8_t year, month, day, hour, minute, second;
 	ds1307_getdate(&year, &month, &day, &hour, &minute, &second);
@@ -364,33 +392,34 @@ void check_and_alarm() {
 
 int main() {
 
-	// set all pins as inputs with pullups
-	// so accidental short to vcc/gnd won't destroy uC
+	/* set all pins as inputs with pullups
+	 * so accidental short to vcc/gnd won't destroy uC
+	 */
 	DDRA = DDRB = DDRC = DDRD = 0x00;
 	PORTA = PORTB = PORTC = PORTD = 0xff;
 
-	// disable JTAG so we can use all pins
+	/* disable JTAG so we can use all pins */
 	MCUCSR |= (1 << JTD);
 	MCUCSR |= (1 << JTD);
 
-	// enable timer overflow interrupts
+	/* enable timer overflow interrupts for PWM */
 	TIMSK |= (1 << TOIE0);
-	// set prescaler, don't know what is now though, but works perfectly
+	/* set prescaler, selected by experimenting, but works perfectly */
 	TCCR0 |= (1 << CS02);
 	TCCR0 &= ~(1 << CS01);
 	TCCR0 &= ~(1 << CS00);
-	// not sure if needed
+	/* not sure if needed TODO */
 	sei();
 
-	// display
+	/* display outputs */
 	DDRB |= 0x0f; // common anodes
 	DDRD = 0xff; // segments
 
-	// buzzer
+	/* buzzer output */
 	CONF_BUZZER_DDR |= _BV(CONF_BUZZER_NUM);
 	CONF_BUZZER_PORT &= ~_BV(CONF_BUZZER_NUM);
 
-	// buttons
+	/* buttons inputs */
 	CONF_BUTTON_SETTIME_DDR &= ~_BV(CONF_BUTTON_SETTIME_NUM);
 	CONF_BUTTON_SETTIME_PORT |= _BV(CONF_BUTTON_SETTIME_NUM);
 
@@ -412,27 +441,25 @@ int main() {
 	CONF_JUMPER_TEMP_DDR &= ~_BV(CONF_JUMPER_TEMP_NUM);
 	CONF_JUMPER_TEMP_PORT |= _BV(CONF_JUMPER_TEMP_NUM);
 
-	// ADC
-	// AREF = AVcc
+	/* ADC: AREF = AVcc */
 	ADMUX = (1 << REFS0);
-	// Enable and prescaler of 128
+	/* Enable and set prescaler = 128 */
 	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 	ADMUX |= (1 << ADLAR);
 
-	// display "init" NOT!
-//	set_display_each_digit(LETTER_I, LETTER_N, LETTER_I, LETTER_T, 1);
-//	delay_ms(1500);
-
-	// start RTC and check if it ticks
+	/* start RTC and check if it ticks
+	 * if battery is empty then it won't start and will be stuck at 0:00:00
+	 * to force start, simply set any hour
+	 */
 	ds1307_init();
 	uint8_t dummy, hour, minute, second;
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
 	if (hour == 0 && minute == 0 && second == 0) {
-		ds1307_setdate(1, 1, 1, 0, 0, 0); // DS won't start if backup battery fails, so this will do the trick
+		ds1307_setdate(1, 1, 1, 0, 0, 0);
 		delay_ms(2000);
 	}
 
-// all times in ms
+
 #define UPDATE_INTERVAL_TIME 100
 #define UPDATE_INTERVAL_TEMP 100 // + 750 ms in temp_read()
 #define REPEATS_TIME 40 // delay already in temp_read()
@@ -440,12 +467,8 @@ int main() {
 
 	int counter = 0;
 
+	/* main loop of the program */
 	while (1) {
-
-		// test place
-//		disp_light();
-//		continue;
-		// test end
 
 		int should_be_displaying_temp = (CONF_JUMPER_TEMP_PIN
 				& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
@@ -483,8 +506,5 @@ int main() {
 			}
 			counter = 0;
 		}
-
-
-
 	}
 }
