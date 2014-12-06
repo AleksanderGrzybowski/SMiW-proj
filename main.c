@@ -116,12 +116,19 @@ ISR(TIMER0_OVF_vect) {
 		cur_digit = 0;
 	}
 
+	// turn off all
+	PORTB |= 15;
+	PORTD = 0x00;
+
+
+
 	// turn on/off current digit, based on pwm current value
 	if (pwm_iter < brightness) {
 		PORTB &= ~(1 << cur_digit);
 	} else {
 		PORTB |= (1 << cur_digit);
 	}
+
 
 	// select segments
 	PORTD = tab[display[cur_digit]];
@@ -174,7 +181,7 @@ void disp_time() {
 	uint8_t hour, minute, second, dummy;
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
 
-	set_display_two_digits(hour, minute, (second % 2 == 0));
+	set_display_two_digits(hour, minute, (second % 2 == 1));
 }
 
 void disp_temp() {
@@ -412,9 +419,9 @@ int main() {
 	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 	ADMUX |= (1 << ADLAR);
 
-	// display "init"
-	set_display_each_digit(LETTER_I, LETTER_N, LETTER_I, LETTER_T, 1);
-	delay_ms(1500);
+	// display "init" NOT!
+//	set_display_each_digit(LETTER_I, LETTER_N, LETTER_I, LETTER_T, 1);
+//	delay_ms(1500);
 
 	// start RTC and check if it ticks
 	ds1307_init();
