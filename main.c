@@ -101,8 +101,8 @@ volatile uint8_t alarm_minute = 0;
 
 /* variables for display */
 volatile char display[4]; // 4 digits, dot handled below
-volatile int dot_on = 0;
-volatile int brightness = 7; // range <0-7>
+volatile int dot_on = 0; // 1 = dot is on, 0 = dot is off
+volatile int brightness = 7; // range <0-7>, 0 = none, 7 = maximum
 
 /* variables for PWM and switching digits */
 volatile int cur_digit = 0; // current displayed digit
