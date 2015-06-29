@@ -17,7 +17,6 @@ void delay_ms(uint16_t count) {
 
 /* Config */
 ////////////////////////////////////////////////////////
-#define CONF_PHOTO_ADC_CHANNEL 7
 
 #define CONF_BUTTON_SETTIME_PORT PORTA
 #define CONF_BUTTON_SETTIME_DDR  DDRA
@@ -34,36 +33,11 @@ void delay_ms(uint16_t count) {
 #define CONF_BUTTON_UP_PIN  PINA
 #define CONF_BUTTON_UP_NUM  2
 
-#define CONF_BUTTON_DISPTEMP_PORT PORTA
-#define CONF_BUTTON_DISPTEMP_DDR  DDRA
-#define CONF_BUTTON_DISPTEMP_PIN  PINA
-#define CONF_BUTTON_DISPTEMP_NUM  3
-
-#define CONF_BUTTON_SETALARM_PORT PORTA
-#define CONF_BUTTON_SETALARM_DDR  DDRA
-#define CONF_BUTTON_SETALARM_PIN  PINA
-#define CONF_BUTTON_SETALARM_NUM  4
-
-#define CONF_JUMPER_BRIG_PORT PORTA
-#define CONF_JUMPER_BRIG_DDR DDRA
-#define CONF_JUMPER_BRIG_PIN  PINA
-#define CONF_JUMPER_BRIG_NUM  5
-
-#define CONF_JUMPER_TEMP_PORT PORTA
-#define CONF_JUMPER_TEMP_DDR DDRA
-#define CONF_JUMPER_TEMP_PIN  PINA
-#define CONF_JUMPER_TEMP_NUM  6
-
-#define CONF_BUZZER_PORT PORTC
-#define CONF_BUZZER_DDR DDRC
-#define CONF_BUZZER_PIN  PINC
-#define CONF_BUZZER_NUM  3
-
 /////////////////////////////////////////////////////
 
 /*
  * Constants decribing segments on 7-seg display.
- * Segments are connected to whole PORTD (this port is hardcoded in ISR) through N-type transistors.
+ * Segments are connected to whole PORTD (this port is hardcoded in ISR).
  * anodes (-> transistors P-type) are connected to low part (0..3) of PORTB.
  */
 #define DOT 128
@@ -94,15 +68,10 @@ char tab[20] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_A 18
 #define LETTER_L 19
 
-/* variables for alarm */
-volatile int alarm_is_set = 0;
-volatile uint8_t alarm_hour = 0;
-volatile uint8_t alarm_minute = 0;
-
 /* variables for display */
 volatile char display[4]; // 4 digits, dot handled below
 volatile int dot_on = 0; // 1 = dot is on, 0 = dot is off
-volatile int brightness = 7; // range <0-7>, 0 = none, 7 = maximum
+volatile int brightness = 4; // range <0-7>, 0 = none, 7 = maximum
 
 /* variables for PWM and switching digits */
 volatile int cur_digit = 0; // current displayed digit
@@ -137,10 +106,10 @@ ISR(TIMER0_OVF_vect) {
 	}
 
 	/* select segments */
-	PORTD = tab[display[cur_digit]];
+	PORTD = ~tab[display[cur_digit]];
 	/* and dot if there is */
 	if (cur_digit == 1 && dot_on)
-		PORTD |= DOT;
+		PORTD &= ~DOT;
 }
 
 /* set display's digits, each digit separately, useful for debugging and used by other funcs */
@@ -295,100 +264,6 @@ void set_time() {
 	ds1307_setdate(1, 1, 1, new_hour, new_minute, 0);
 }
 
-/* if alarm is on, turn it off, otherwise, turn it on */
-void set_or_turn_off_alarm() {
-	uint8_t dummy;
-	uint8_t hour = 0;
-	uint8_t minute = 0;
-
-	if (alarm_is_set) { // then turn it off
-		set_display_each_digit(LETTER_O, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
-		delay_ms(1000);
-		alarm_is_set = 0;
-	} else { // turn it on
-		alarm_is_set = 1;
-		set_display_each_digit(LETTER_A, LETTER_L, LETTER_A, EMPTY_DIGIT, 0);
-		delay_ms(1000);
-		ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &dummy);
-		get_time_from_user(hour, minute, &alarm_hour, &alarm_minute); // modify global state!
-		set_display_each_digit(LETTER_O, LETTER_M, EMPTY_DIGIT, EMPTY_DIGIT, 0);
-		delay_ms(1000);
-	}
-}
-
-/* make some noise while waiting for the user to turn off the alarm
- * using OFF button
- */
-void ring_alarm() {
-	disp_time();
-	while (CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM)) {
-		CONF_BUZZER_PORT ^= _BV(CONF_BUZZER_NUM);
-		delay_ms(200);
-	}
-	CONF_BUZZER_PORT &= ~_BV(CONF_BUZZER_NUM);
-	alarm_is_set = 0;
-	set_display_each_digit(LETTER_O, LETTER_F, LETTER_F, EMPTY_DIGIT, 0);
-	delay_ms(1000);
-	alarm_is_set = 0;
-}
-
-/* function to read light reading from ADC, copied from the internet
- * comments below are not mine :)
- */
-uint16_t adc_read() {
-	uint8_t ch = CONF_PHOTO_ADC_CHANNEL;
-	// select the corresponding channel 0~7
-	// ANDing with ’7′ will always keep the value
-	// of ‘ch’ between 0 and 7
-	ch &= 0b00000111;  // AND operation with 7
-	ADMUX = (ADMUX & 0xF8) | ch; // clears the bottom 3 bits before ORing
-
-	// start single convertion
-	// write ’1′ to ADSC
-	ADCSRA |= (1 << ADSC);
-
-	// wait for conversion to complete
-	// ADSC becomes ’0′ again
-	// till then, run loop continuously
-	while (ADCSRA & (1 << ADSC))
-		;
-
-	return (ADCH);
-}
-
-/* display light intensity reading, not used in production */
-void disp_light() {
-	int res = adc_read();
-	set_display_whole_number(res);
-}
-
-/* read light intensity and set PWM threshold value accordingly */
-void regulate_brightness() {
-	int should_be_full_brig = (CONF_JUMPER_BRIG_PIN
-			& (1 << CONF_JUMPER_BRIG_NUM)) != 0;
-	if (should_be_full_brig) {
-		brightness = 7;
-		return;
-	}
-
-	int reading = adc_read();
-
-	if (reading >= 254)
-		brightness = 2;
-	else
-		brightness = 7;
-}
-
-/* check if there should be an alarm ringing
- * if it is the case, ring
- */
-void check_and_alarm() {
-	uint8_t year, month, day, hour, minute, second;
-	ds1307_getdate(&year, &month, &day, &hour, &minute, &second);
-
-	if (minute == alarm_minute && hour == alarm_hour && alarm_is_set == 1)
-		ring_alarm();
-}
 
 int main() {
 
@@ -415,9 +290,6 @@ int main() {
 	DDRB |= 0x0f; // common anodes
 	DDRD = 0xff; // segments
 
-	/* buzzer output */
-	CONF_BUZZER_DDR |= _BV(CONF_BUZZER_NUM);
-	CONF_BUZZER_PORT &= ~_BV(CONF_BUZZER_NUM);
 
 	/* buttons inputs */
 	CONF_BUTTON_SETTIME_DDR &= ~_BV(CONF_BUTTON_SETTIME_NUM);
@@ -428,24 +300,6 @@ int main() {
 
 	CONF_BUTTON_DOWN_DDR &= ~_BV(CONF_BUTTON_DOWN_NUM);
 	CONF_BUTTON_DOWN_PORT |= _BV(CONF_BUTTON_DOWN_NUM);
-
-	CONF_BUTTON_DISPTEMP_DDR &= ~_BV(CONF_BUTTON_DISPTEMP_NUM);
-	CONF_BUTTON_DISPTEMP_PORT |= _BV(CONF_BUTTON_DISPTEMP_NUM);
-
-	CONF_BUTTON_SETALARM_DDR &= ~_BV(CONF_BUTTON_SETALARM_NUM);
-	CONF_BUTTON_SETALARM_PORT |= _BV(CONF_BUTTON_SETALARM_NUM);
-
-	CONF_JUMPER_BRIG_DDR &= ~_BV(CONF_JUMPER_BRIG_NUM);
-	CONF_JUMPER_BRIG_PORT |= _BV(CONF_JUMPER_BRIG_NUM);
-
-	CONF_JUMPER_TEMP_DDR &= ~_BV(CONF_JUMPER_TEMP_NUM);
-	CONF_JUMPER_TEMP_PORT |= _BV(CONF_JUMPER_TEMP_NUM);
-
-	/* ADC: AREF = AVcc */
-	ADMUX = (1 << REFS0);
-	/* Enable and set prescaler = 128 */
-	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-	ADMUX |= (1 << ADLAR);
 
 	/* start RTC and check if it ticks
 	 * if battery is empty then it won't start and will be stuck at 0:00:00
@@ -470,8 +324,7 @@ int main() {
 	/* main loop of the program */
 	while (1) {
 
-		int should_be_displaying_temp = (CONF_JUMPER_TEMP_PIN
-				& (1 << CONF_JUMPER_TEMP_NUM)) != 0;
+		int should_be_displaying_temp = 1;
 
 		if (counter < REPEATS_TIME)
 			disp_time();
@@ -483,28 +336,11 @@ int main() {
 		counter++;
 		delay_ms(UPDATE_INTERVAL_TIME);
 
-		regulate_brightness();
-		check_and_alarm();
 
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
 			counter = 0;
 		}
-		if (!(CONF_BUTTON_SETALARM_PIN & _BV(CONF_BUTTON_SETALARM_NUM))) {
-			set_or_turn_off_alarm();
-			counter = 0;
-		}
 
-		if (!(CONF_BUTTON_DISPTEMP_PIN & _BV(CONF_BUTTON_DISPTEMP_NUM))) {
-			set_display_each_digit(LETTER_T, LETTER_E, LETTER_M, LETTER_P, 0);
-			delay_ms(1000);
-			int j;
-			for (j = 0; j < REPEATS_TEMP; ++j) {
-				disp_temp();
-				regulate_brightness();
-				delay_ms(UPDATE_INTERVAL_TEMP);
-			}
-			counter = 0;
-		}
 	}
 }
