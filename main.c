@@ -1,4 +1,4 @@
-#define F_CPU 16000000UL // 16 MHz clock
+#define F_CPU 8000000UL
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -18,19 +18,19 @@ void delay_ms(uint16_t count) {
 /* Config */
 ////////////////////////////////////////////////////////
 
-#define CONF_BUTTON_SETTIME_PORT PORTA
-#define CONF_BUTTON_SETTIME_DDR  DDRA
-#define CONF_BUTTON_SETTIME_PIN  PINA
+#define CONF_BUTTON_SETTIME_PORT PORTC
+#define CONF_BUTTON_SETTIME_DDR  DDRC
+#define CONF_BUTTON_SETTIME_PIN  PINC
 #define CONF_BUTTON_SETTIME_NUM  0
 
-#define CONF_BUTTON_DOWN_PORT PORTA
-#define CONF_BUTTON_DOWN_DDR  DDRA
-#define CONF_BUTTON_DOWN_PIN  PINA
+#define CONF_BUTTON_DOWN_PORT PORTC
+#define CONF_BUTTON_DOWN_DDR  DDRC
+#define CONF_BUTTON_DOWN_PIN  PINC
 #define CONF_BUTTON_DOWN_NUM  1
 
-#define CONF_BUTTON_UP_PORT PORTA
-#define CONF_BUTTON_UP_DDR  DDRA
-#define CONF_BUTTON_UP_PIN  PINA
+#define CONF_BUTTON_UP_PORT PORTC
+#define CONF_BUTTON_UP_DDR  DDRC
+#define CONF_BUTTON_UP_PIN  PINC
 #define CONF_BUTTON_UP_NUM  2
 
 /////////////////////////////////////////////////////
@@ -71,11 +71,11 @@ char tab[20] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 /* variables for display */
 volatile char display[4]; // 4 digits, dot handled below
 volatile int dot_on = 0; // 1 = dot is on, 0 = dot is off
-volatile int brightness = 4; // range <0-7>, 0 = none, 7 = maximum
+volatile int brightness = 7; // range <0-7>, 0 = none, 7 = maximum
 
 /* variables for PWM and switching digits */
+volatile int pwm_iter = 0;
 volatile int cur_digit = 0; // current displayed digit
-volatile int pwm_iter = 0; // current PWM iteration in range <0..7>
 
 /* ISR used to multiplex 7-seg 4-digit display */
 ISR(TIMER0_OVF_vect) {
@@ -83,7 +83,7 @@ ISR(TIMER0_OVF_vect) {
 	/* regulate speed of multiplexing, less = slower
 	 * this is way simpler than fiddling with prescalers :)
 	 */
-	TCNT0 = 220;
+	TCNT0 = 240;
 
 	pwm_iter++;
 	if (pwm_iter == 8) {
@@ -270,19 +270,15 @@ int main() {
 	/* set all pins as inputs with pullups
 	 * so accidental short to vcc/gnd won't destroy uC
 	 */
-	DDRA = DDRB = DDRC = DDRD = 0x00;
-	PORTA = PORTB = PORTC = PORTD = 0xff;
-
-	/* disable JTAG so we can use all pins */
-	MCUCSR |= (1 << JTD);
-	MCUCSR |= (1 << JTD);
+	DDRB = DDRC = DDRD = 0x00;
+	PORTB = PORTC = PORTD = 0xff;
 
 	/* enable timer overflow interrupts for PWM */
-	TIMSK |= (1 << TOIE0);
+	TIMSK0 |= (1 << TOIE0);
 	/* set prescaler, selected by experimenting, but works perfectly */
-	TCCR0 |= (1 << CS02);
-	TCCR0 &= ~(1 << CS01);
-	TCCR0 &= ~(1 << CS00);
+	TCCR0B |= (1 << CS02);
+	TCCR0B &= ~(1 << CS01);
+	TCCR0B &= ~(1 << CS00);
 	/* not sure if needed TODO */
 	sei();
 
@@ -323,8 +319,7 @@ int main() {
 
 	/* main loop of the program */
 	while (1) {
-
-		int should_be_displaying_temp = 1;
+		int should_be_displaying_temp = 1; // for testing
 
 		if (counter < REPEATS_TIME)
 			disp_time();
