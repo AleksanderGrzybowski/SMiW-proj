@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "ds1307.h"
-#include "ds18b20.h"
 
 /* Function to do simple active blocking delay */
 void delay_ms(uint16_t count) {
@@ -165,30 +164,6 @@ void disp_time() {
 	set_display_two_digits(hour, minute, (second % 2 == 1));
 }
 
-/* display current temperature */
-void disp_temp() {
-	unsigned char ds18b20_pad[9];
-
-	ds18b20_ConvertT();
-	_delay_ms(750); // shows garbage without it, read the docs!!!
-	ds18b20_Read(ds18b20_pad);
-
-	float temp = ((ds18b20_pad[1] << 8) + ds18b20_pad[0]) / 16.0;
-
-	/* we want 1 decimal place after the dot, so the simplest way
-	 * to do that is multiply the reading (as float) by 10 and show it as 3-digit integer
-	 */
-	int itemp = (int) (temp * 10.0);
-
-	int d2 = itemp % 10;
-	itemp /= 10;
-	int d1 = itemp % 10;
-	itemp /= 10;
-	int d0 = itemp % 10;
-
-	set_display_each_digit(d0, d1, d2, DASH, 1);
-}
-
 /* ask user to input time */
 #define DEBOUNCE_DELAY 100 // ms
 void get_time_from_user(int hour, int minute, uint8_t* out_hour,
@@ -311,31 +286,14 @@ int main() {
 
 
 #define UPDATE_INTERVAL_TIME 100
-#define UPDATE_INTERVAL_TEMP 100 // + 750 ms in temp_read()
-#define REPEATS_TIME 40 // delay already in temp_read()
-#define REPEATS_TEMP 3 // delay already in temp_read()
-
-	int counter = 0;
 
 	/* main loop of the program */
 	while (1) {
-		int should_be_displaying_temp = 1; // for testing
-
-		if (counter < REPEATS_TIME)
-			disp_time();
-		else if ((counter < (REPEATS_TEMP + REPEATS_TIME)) && should_be_displaying_temp)
-			disp_temp();
-		else
-			counter = -1;
-
-		counter++;
+		disp_time();
 		delay_ms(UPDATE_INTERVAL_TIME);
-
 
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
-			counter = 0;
 		}
-
 	}
 }
