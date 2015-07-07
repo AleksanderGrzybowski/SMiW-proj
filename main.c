@@ -95,7 +95,7 @@ ISR(TIMER0_OVF_vect) {
 
 	/* turn off all digits to avoid ghosting */
 	PORTB |= 15;
-	PORTD = 0x00;
+	PORTD = 0xff;
 
 	/* turn on/off current digit, based on pwm current value */
 	if (pwm_iter < brightness) {
