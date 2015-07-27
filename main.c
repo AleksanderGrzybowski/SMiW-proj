@@ -47,12 +47,12 @@ void delay_ms(uint16_t count) {
 #define C 4
 #define B 2
 #define A 1
-char tab[20] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
+char tab[21] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G + C + D), (F + G + B + C), (A + F + G + C + D), (A + F + G + E + D
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
 		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
 		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G), (A
-				+ B + C + E + F + G), (D + E + F) };
+				+ B + C + E + F + G), (D + E + F), (B + C + D + E + G) };
 #define LETTER_I 1
 #define LETTER_O 0
 #define DASH 10
@@ -66,6 +66,7 @@ char tab[20] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_F 17
 #define LETTER_A 18
 #define LETTER_L 19
+#define LETTER_D 20
 
 /* variables for display */
 volatile char display[4]; // 4 digits, dot handled below
@@ -224,6 +225,28 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 	*out_minute = minute;
 }
 
+void get_brightness_from_user() {
+	set_display_each_digit(LETTER_D, 1, LETTER_S, LETTER_P, 0); // DISP
+
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
+		delay_ms(DEBOUNCE_DELAY);
+		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
+			if (brightness < 7) {
+				brightness++;
+			}
+			delay_ms(DEBOUNCE_DELAY);
+		}
+		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
+			if (brightness > 1) {
+				brightness--;
+			}
+			delay_ms(DEBOUNCE_DELAY);
+		}
+	}
+
+	delay_ms(DEBOUNCE_DELAY);
+}
+
 /* ask user for time and set it as current time */
 void set_time() {
 	uint8_t dummy;
@@ -294,6 +317,7 @@ int main() {
 
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
+			get_brightness_from_user();
 		}
 	}
 }
