@@ -5,6 +5,7 @@
 #include <avr/interrupt.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <avr/eeprom.h>
 #include "ds1307.h"
 
 /* Function to do simple active blocking delay */
@@ -31,6 +32,8 @@ void delay_ms(uint16_t count) {
 #define CONF_BUTTON_UP_DDR  DDRC
 #define CONF_BUTTON_UP_PIN  PINC
 #define CONF_BUTTON_UP_NUM  2
+
+#define BRIGHTNESS_EEPROM_LOCATION 13
 
 /////////////////////////////////////////////////////
 
@@ -243,7 +246,7 @@ void get_brightness_from_user() {
 			delay_ms(DEBOUNCE_DELAY);
 		}
 	}
-
+	eeprom_write_byte((uint8_t*)BRIGHTNESS_EEPROM_LOCATION, brightness);
 	delay_ms(DEBOUNCE_DELAY);
 }
 
@@ -268,6 +271,12 @@ int main() {
 	/* set all pins as inputs with pullups
 	 * so accidental short to vcc/gnd won't destroy uC
 	 */
+
+	brightness = eeprom_read_byte((uint8_t*)BRIGHTNESS_EEPROM_LOCATION);
+	if (!(brightness >= 1 && brightness <= 7)) {
+		brightness = 3;
+	}
+
 	DDRB = DDRC = DDRD = 0x00;
 	PORTB = PORTC = PORTD = 0xff;
 
