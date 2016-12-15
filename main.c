@@ -1,4 +1,4 @@
-#define F_CPU 8000000UL
+//#define F_CPU 1000000UL
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -86,7 +86,7 @@ ISR(TIMER0_OVF_vect) {
 	/* regulate speed of multiplexing, less = slower
 	 * this is way simpler than fiddling with prescalers :)
 	 */
-	TCNT0 = 240;
+	TCNT0 = 250;
 
 	pwm_iter++;
 	if (pwm_iter == 8) {
@@ -283,9 +283,9 @@ int main() {
 	/* enable timer overflow interrupts for PWM */
 	TIMSK0 |= (1 << TOIE0);
 	/* set prescaler, selected by experimenting, but works perfectly */
-	TCCR0B |= (1 << CS02);
-	TCCR0B &= ~(1 << CS01);
-	TCCR0B &= ~(1 << CS00);
+	TCCR0B &= (1 << CS02);
+	TCCR0B |= (1 << CS01);
+	TCCR0B |= (1 << CS00);
 	/* not sure if needed TODO */
 	sei();
 

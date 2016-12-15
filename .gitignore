@@ -4,3 +4,4 @@ Release
 *.tmp
 *.o
 .settings
+target/
