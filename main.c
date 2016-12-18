@@ -18,30 +18,25 @@ void delay_ms(uint16_t count) {
 /* Config */
 ////////////////////////////////////////////////////////
 
-#define CONF_BUTTON_SETTIME_PORT PORTC
-#define CONF_BUTTON_SETTIME_DDR  DDRC
-#define CONF_BUTTON_SETTIME_PIN  PINC
-#define CONF_BUTTON_SETTIME_NUM  0
+#define CONF_BUTTON_SETTIME_PORT PORTD
+#define CONF_BUTTON_SETTIME_DDR  DDRD
+#define CONF_BUTTON_SETTIME_PIN  PIND
+#define CONF_BUTTON_SETTIME_NUM  5
 
-#define CONF_BUTTON_DOWN_PORT PORTC
-#define CONF_BUTTON_DOWN_DDR  DDRC
-#define CONF_BUTTON_DOWN_PIN  PINC
-#define CONF_BUTTON_DOWN_NUM  1
+#define CONF_BUTTON_DOWN_PORT PORTD
+#define CONF_BUTTON_DOWN_DDR  DDRD
+#define CONF_BUTTON_DOWN_PIN  PIND
+#define CONF_BUTTON_DOWN_NUM  6
 
-#define CONF_BUTTON_UP_PORT PORTC
-#define CONF_BUTTON_UP_DDR  DDRC
-#define CONF_BUTTON_UP_PIN  PINC
-#define CONF_BUTTON_UP_NUM  2
+#define CONF_BUTTON_UP_PORT PORTD
+#define CONF_BUTTON_UP_DDR  DDRD
+#define CONF_BUTTON_UP_PIN  PIND
+#define CONF_BUTTON_UP_NUM  7
 
 #define BRIGHTNESS_EEPROM_LOCATION 13
 
 /////////////////////////////////////////////////////
 
-/*
- * Constants decribing segments on 7-seg display.
- * Segments are connected to whole PORTD (this port is hardcoded in ISR).
- * anodes (-> transistors P-type) are connected to low part (0..3) of PORTB.
- */
 #define DOT 128
 #define G 64
 #define F 32
@@ -98,21 +93,73 @@ ISR(TIMER0_OVF_vect) {
 	}
 
 	/* turn off all digits to avoid ghosting */
-	PORTB |= 15;
-	PORTD = 0xff;
+	//PORTB |= 15;
+    PORTB |= (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
+
+	//PORTD = 0xff;
+    PORTC |= (1 << PC0) | (1 << PC1) | (1 << PC2) | (1 << PC3);
+    PORTD |= (1 << PD1) | (1 << PD2) | (1 << PD3) | (1 << PD4);
 
 	/* turn on/off current digit, based on pwm current value */
 	if (pwm_iter < brightness) {
-		PORTB &= ~(1 << cur_digit);
+		PORTB &= ~(1 << (cur_digit+1)); // this is ok, there are in sequence
 	} else {
-		PORTB |= (1 << cur_digit);
+		PORTB |= (1 << (cur_digit+1));
 	}
 
 	/* select segments */
-	PORTD = ~tab[display[cur_digit]];
+	//PORTD = ~tab[display[cur_digit]];
+
+    uint8_t value = ~tab[display[cur_digit]];
+
+    if (value & 1) {
+        PORTD |= (1 << PD1);
+    } else {
+        PORTD &= ~(1 << PD1);
+    }
+
+    if (value & 2) {
+        PORTD |= (1 << PD2);
+    } else {
+        PORTD &= ~(1 << PD2);
+    }
+
+    if (value & 4) {
+        PORTD |= (1 << PD4);
+    } else {
+        PORTD &= ~(1 << PD4);
+    }
+    if (value & 8) {
+        PORTD |= (1 << PD3);
+    } else {
+        PORTD &= ~(1 << PD3);
+    }
+
+    if (value & 16) {
+        PORTC |= (1 << PC2);
+    } else {
+        PORTC &= ~(1 << PC2);
+    }
+    if (value & 32) {
+        PORTC |= (1 << PC3);
+    } else {
+        PORTC &= ~(1 << PC3);
+    }
+    if (value & 64) {
+        PORTC |= (1 << PC0);
+    } else {
+        PORTC &= ~(1 << PC0);
+    }
+
+
 	/* and dot if there is */
-	if (cur_digit == 1 && dot_on)
-		PORTD &= ~DOT;
+	if (cur_digit == 1 && dot_on) {
+		//PORTD &= ~DOT;
+        PORTC &= ~(1 << PC1);
+    } else {
+        PORTC |= (1 << PC1);
+    }
+
 }
 
 /* set display's digits, each digit separately, useful for debugging and used by other funcs */
@@ -277,8 +324,10 @@ int main() {
 		brightness = 3;
 	}
 
+
 	DDRB = DDRC = DDRD = 0x00;
 	PORTB = PORTC = PORTD = 0xff;
+
 
 	/* enable timer overflow interrupts for PWM */
 	TIMSK0 |= (1 << TOIE0);
@@ -290,8 +339,12 @@ int main() {
 	sei();
 
 	/* display outputs */
-	DDRB |= 0x0f; // common anodes
-	DDRD = 0xff; // segments
+	//DDRB |= 0x0f; // common anodes
+    DDRB |= (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
+	//DDRD = 0xff; // segments
+    DDRC |= (1 << PC0) | (1 << PC1) | (1 << PC2) | (1 << PC3);
+    DDRD |= (1 << PD1) | (1 << PD2) | (1 << PD3) | (1 << PD4);
+
 
 
 	/* buttons inputs */
