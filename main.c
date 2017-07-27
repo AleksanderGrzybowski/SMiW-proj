@@ -8,14 +8,6 @@
 #include <avr/eeprom.h>
 #include "ds1307.h"
 
-void hack() {
-    DDRD &= ~(1 << PD1);
-    PORTD |= (1 << PD1);
-    DDRD &= ~(1 << PD0);
-    PORTD |= (1 << PD0);
-    DDRD &= ~(1 << PD2);
-    PORTD |= (1 << PD2);
-}
 
 /* Function to do simple active blocking delay */
 void delay_ms(uint16_t count) {
@@ -113,16 +105,16 @@ ISR(TIMER0_OVF_vect) {
 	/* turn on/off current digit, based on pwm current value */
 	if (pwm_iter < brightness) {
         // turn on
-        if (cur_digit == 1) {
+        if (cur_digit == 3) {
             PORTC &= ~(1 << PC0);
         }
-        if (cur_digit == 3) {
+        if (cur_digit == 1) {
             PORTC &= ~(1 << PC1);
         }
-        if (cur_digit == 0) {
+        if (cur_digit == 2) {
             PORTD &= ~(1 << PD3);
         }
-        if (cur_digit == 2) {
+        if (cur_digit == 0) {
             PORTD &= ~(1 << PD4);
         }
 	} else {
@@ -245,20 +237,14 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 
 	int flip = 0;
 
-	while (1) { // wait for hours
-        hack();
-        if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
-            break;
-        }
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
-        hack();
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			hour++;
 			if (hour == 24)
 				hour = 0;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-        hack();
 		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			hour--;
 			if (hour == -1)
@@ -275,21 +261,14 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 	}
 	delay_ms(DEBOUNCE_DELAY);
 
-    hack();
-	while (1) { // wait for minutes
-        hack();
-        if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
-            break;
-        }
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for minutes
 		delay_ms(DEBOUNCE_DELAY);
-        hack();
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			minute++;
 			if (minute == 60)
 				minute = 0;
 			delay_ms(DEBOUNCE_DELAY);
 		}
-        hack();
 		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			minute--;
 			if (minute == -1)
@@ -314,20 +293,14 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 void get_brightness_from_user() {
 	set_display_each_digit(LETTER_D, 1, LETTER_S, LETTER_P, 0); // DISP
 
-	while (1) { // wait for hours
-        hack();
-        if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
-            break;
-        }
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
-        hack();
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			if (brightness < 7) {
 				brightness++;
 			}
 			delay_ms(DEBOUNCE_DELAY);
 		}
-        hack();
 		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			if (brightness > 1) {
 				brightness--;
@@ -371,9 +344,6 @@ int main() {
 		brightness = 3;
 	}
 
-    brightness = 6;
-
-
 	/* enable timer overflow interrupts for PWM */
 	TIMSK |= (1 << TOIE0);
 	/* set prescaler, selected by experimenting, but works perfectly */
@@ -409,22 +379,6 @@ int main() {
 	CONF_BUTTON_DOWN_PORT |= _BV(CONF_BUTTON_DOWN_NUM);
 
 
-
-
-    /*
-    while(1) {
-        DDRD &= ~(1 << PD1);
-        PORTD |= (1 << PD1);
-        _delay_ms(1);
-        if (PIND & (1 << PD1)) {
-            set_display_whole_number(1111);
-        } else {
-            set_display_whole_number(2222);
-        }
-    }
-    */
-   
-
 	/* start RTC and check if it ticks
 	 * if battery is empty then it won't start and will be stuck at 0:00:00
 	 * to force start, simply set any hour
@@ -434,6 +388,7 @@ int main() {
 	ds1307_getdate(&dummy, &dummy, &dummy, &hour, &minute, &second);
 	if (hour == 0 && minute == 0 && second == 0) {
 		ds1307_setdate(1, 1, 1, 0, 0, 0);
+        set_display_each_digit(DASH, DASH, DASH, DASH, 1);
 		delay_ms(2000);
 	}
 
@@ -444,7 +399,6 @@ int main() {
 	while (1) {
 		disp_time();
 		delay_ms(UPDATE_INTERVAL_TIME);
-        hack();
 
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
