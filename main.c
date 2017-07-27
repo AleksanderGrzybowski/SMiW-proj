@@ -8,6 +8,15 @@
 #include <avr/eeprom.h>
 #include "ds1307.h"
 
+void hack() {
+    DDRD &= ~(1 << PD1);
+    PORTD |= (1 << PD1);
+    DDRD &= ~(1 << PD0);
+    PORTD |= (1 << PD0);
+    DDRD &= ~(1 << PD2);
+    PORTD |= (1 << PD2);
+}
+
 /* Function to do simple active blocking delay */
 void delay_ms(uint16_t count) {
 	while (count--) {
@@ -21,17 +30,17 @@ void delay_ms(uint16_t count) {
 #define CONF_BUTTON_SETTIME_PORT PORTD
 #define CONF_BUTTON_SETTIME_DDR  DDRD
 #define CONF_BUTTON_SETTIME_PIN  PIND
-#define CONF_BUTTON_SETTIME_NUM  5
+#define CONF_BUTTON_SETTIME_NUM  1
 
 #define CONF_BUTTON_DOWN_PORT PORTD
 #define CONF_BUTTON_DOWN_DDR  DDRD
 #define CONF_BUTTON_DOWN_PIN  PIND
-#define CONF_BUTTON_DOWN_NUM  6
+#define CONF_BUTTON_DOWN_NUM  0
 
 #define CONF_BUTTON_UP_PORT PORTD
 #define CONF_BUTTON_UP_DDR  DDRD
 #define CONF_BUTTON_UP_PIN  PIND
-#define CONF_BUTTON_UP_NUM  7
+#define CONF_BUTTON_UP_NUM  2
 
 #define BRIGHTNESS_EEPROM_LOCATION 13
 
@@ -236,14 +245,20 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 
 	int flip = 0;
 
-	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
+	while (1) { // wait for hours
+        hack();
+        if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
+            break;
+        }
 		delay_ms(DEBOUNCE_DELAY);
+        hack();
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			hour++;
 			if (hour == 24)
 				hour = 0;
 			delay_ms(DEBOUNCE_DELAY);
 		}
+        hack();
 		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			hour--;
 			if (hour == -1)
@@ -260,14 +275,21 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 	}
 	delay_ms(DEBOUNCE_DELAY);
 
-	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for minutes
+    hack();
+	while (1) { // wait for minutes
+        hack();
+        if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
+            break;
+        }
 		delay_ms(DEBOUNCE_DELAY);
+        hack();
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			minute++;
 			if (minute == 60)
 				minute = 0;
 			delay_ms(DEBOUNCE_DELAY);
 		}
+        hack();
 		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			minute--;
 			if (minute == -1)
@@ -292,14 +314,20 @@ void get_time_from_user(int hour, int minute, uint8_t* out_hour,
 void get_brightness_from_user() {
 	set_display_each_digit(LETTER_D, 1, LETTER_S, LETTER_P, 0); // DISP
 
-	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
+	while (1) { // wait for hours
+        hack();
+        if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
+            break;
+        }
 		delay_ms(DEBOUNCE_DELAY);
+        hack();
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
 			if (brightness < 7) {
 				brightness++;
 			}
 			delay_ms(DEBOUNCE_DELAY);
 		}
+        hack();
 		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
 			if (brightness > 1) {
 				brightness--;
@@ -337,6 +365,7 @@ int main() {
 	DDRB = DDRC = DDRD = 0x00;
 	PORTB = PORTC = PORTD = 0xff;
 
+
 	brightness = eeprom_read_byte((uint8_t*)BRIGHTNESS_EEPROM_LOCATION);
 	if (!(brightness >= 1 && brightness <= 7)) {
 		brightness = 3;
@@ -344,14 +373,17 @@ int main() {
 
     brightness = 6;
 
+
 	/* enable timer overflow interrupts for PWM */
-	TIMSK0 |= (1 << TOIE0);
+	TIMSK |= (1 << TOIE0);
 	/* set prescaler, selected by experimenting, but works perfectly */
-	TCCR0B &= (1 << CS02);
-	TCCR0B |= (1 << CS01);
-	TCCR0B |= (1 << CS00);
+	TCCR0 &= (1 << CS02);
+	TCCR0 |= (1 << CS01);
+	TCCR0 |= (1 << CS00);
 	/* not sure if needed TODO */
 	sei();
+
+
 
 	/* display outputs */
 	//DDRB |= 0x0f; // common anodes
@@ -361,8 +393,9 @@ int main() {
     DDRB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
     DDRD |= (1 << PD5) | (1 << PD6) | (1 << PD7);
 
-    set_display_two_digits(12,34, 1);
-    while(1);
+    //set_display_two_digits(12,34, 1);
+    //_delay_ms(1000);
+
 
 
 	/* buttons inputs */
@@ -374,6 +407,23 @@ int main() {
 
 	CONF_BUTTON_DOWN_DDR &= ~_BV(CONF_BUTTON_DOWN_NUM);
 	CONF_BUTTON_DOWN_PORT |= _BV(CONF_BUTTON_DOWN_NUM);
+
+
+
+
+    /*
+    while(1) {
+        DDRD &= ~(1 << PD1);
+        PORTD |= (1 << PD1);
+        _delay_ms(1);
+        if (PIND & (1 << PD1)) {
+            set_display_whole_number(1111);
+        } else {
+            set_display_whole_number(2222);
+        }
+    }
+    */
+   
 
 	/* start RTC and check if it ticks
 	 * if battery is empty then it won't start and will be stuck at 0:00:00
@@ -394,6 +444,7 @@ int main() {
 	while (1) {
 		disp_time();
 		delay_ms(UPDATE_INTERVAL_TIME);
+        hack();
 
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
