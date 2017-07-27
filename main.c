@@ -93,71 +93,85 @@ ISR(TIMER0_OVF_vect) {
 	}
 
 	/* turn off all digits to avoid ghosting */
-	//PORTB |= 15;
-    PORTB |= (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
+    PORTB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
+    PORTD |= (1 << PD5) | (1 << PD6) | (1 << PD7);
 
-	//PORTD = 0xff;
-    PORTC |= (1 << PC0) | (1 << PC1) | (1 << PC2) | (1 << PC3);
-    PORTD |= (1 << PD1) | (1 << PD2) | (1 << PD3) | (1 << PD4);
+    PORTC |= (1 << PC0);
+    PORTC |= (1 << PC1);
+    PORTD |= (1 << PD3);
+    PORTD |= (1 << PD4);
 
 	/* turn on/off current digit, based on pwm current value */
 	if (pwm_iter < brightness) {
-		PORTB &= ~(1 << (cur_digit+1)); // this is ok, there are in sequence
+        // turn on
+        if (cur_digit == 1) {
+            PORTC &= (1 << PC0);
+        }
+        if (cur_digit == 3) {
+            PORTC &= (1 << PC1);
+        }
+        if (cur_digit == 0) {
+            PORTD &= (1 << PD3);
+        }
+        if (cur_digit == 2) {
+            PORTD &= (1 << PD4);
+        }
 	} else {
-		PORTB |= (1 << (cur_digit+1));
+        // turn off
+        PORTC |= (1 << PC0);
+        PORTC |= (1 << PC1);
+        PORTD |= (1 << PD3);
+        PORTD |= (1 << PD4);
 	}
 
 	/* select segments */
-	//PORTD = ~tab[display[cur_digit]];
 
     uint8_t value = ~tab[display[cur_digit]];
 
     if (value & 1) {
-        PORTD |= (1 << PD1);
+        PORTD |= (1 << PD7);
     } else {
-        PORTD &= ~(1 << PD1);
+        PORTD &= ~(1 << PD7);
     }
 
     if (value & 2) {
-        PORTD |= (1 << PD2);
+        PORTD |= (1 << PD5);
     } else {
-        PORTD &= ~(1 << PD2);
+        PORTD &= ~(1 << PD5);
     }
 
     if (value & 4) {
-        PORTD |= (1 << PD4);
+        PORTB |= (1 << PB3);
     } else {
-        PORTD &= ~(1 << PD4);
+        PORTB &= ~(1 << PB3);
     }
     if (value & 8) {
-        PORTD |= (1 << PD3);
+        PORTB |= (1 << PB1);
     } else {
-        PORTD &= ~(1 << PD3);
+        PORTB &= ~(1 << PB1);
     }
 
     if (value & 16) {
-        PORTC |= (1 << PC2);
+        PORTB |= (1 << PB0);
     } else {
-        PORTC &= ~(1 << PC2);
+        PORTB &= ~(1 << PB0);
     }
     if (value & 32) {
-        PORTC |= (1 << PC3);
+        PORTD |= (1 << PD6);
     } else {
-        PORTC &= ~(1 << PC3);
+        PORTD &= ~(1 << PD6);
     }
     if (value & 64) {
-        PORTC |= (1 << PC0);
+        PORTB |= (1 << PB4);
     } else {
-        PORTC &= ~(1 << PC0);
+        PORTB &= ~(1 << PB4);
     }
-
 
 	/* and dot if there is */
 	if (cur_digit == 1 && dot_on) {
-		//PORTD &= ~DOT;
-        PORTC &= ~(1 << PC1);
+        PORTB &= ~(1 << PB2);
     } else {
-        PORTC |= (1 << PC1);
+        PORTB |= (1 << PB2);
     }
 
 }
@@ -319,15 +333,16 @@ int main() {
 	 * so accidental short to vcc/gnd won't destroy uC
 	 */
 
+
+	DDRB = DDRC = DDRD = 0x00;
+	PORTB = PORTC = PORTD = 0xff;
+
 	brightness = eeprom_read_byte((uint8_t*)BRIGHTNESS_EEPROM_LOCATION);
 	if (!(brightness >= 1 && brightness <= 7)) {
 		brightness = 3;
 	}
 
-
-	DDRB = DDRC = DDRD = 0x00;
-	PORTB = PORTC = PORTD = 0xff;
-
+    brightness = 6;
 
 	/* enable timer overflow interrupts for PWM */
 	TIMSK0 |= (1 << TOIE0);
@@ -340,11 +355,14 @@ int main() {
 
 	/* display outputs */
 	//DDRB |= 0x0f; // common anodes
-    DDRB |= (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
+    DDRC |= (1 << PC0) | (1 << PC1);
+    DDRD |= (1 << PD3) | (1 << PD4);
 	//DDRD = 0xff; // segments
-    DDRC |= (1 << PC0) | (1 << PC1) | (1 << PC2) | (1 << PC3);
-    DDRD |= (1 << PD1) | (1 << PD2) | (1 << PD3) | (1 << PD4);
+    DDRB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4);
+    DDRD |= (1 << PD5) | (1 << PD6) | (1 << PD7);
 
+    set_display_two_digits(12,34, 1);
+    while(1);
 
 
 	/* buttons inputs */
