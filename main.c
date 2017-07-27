@@ -114,16 +114,16 @@ ISR(TIMER0_OVF_vect) {
 	if (pwm_iter < brightness) {
         // turn on
         if (cur_digit == 1) {
-            PORTC &= (1 << PC0);
+            PORTC &= ~(1 << PC0);
         }
         if (cur_digit == 3) {
-            PORTC &= (1 << PC1);
+            PORTC &= ~(1 << PC1);
         }
         if (cur_digit == 0) {
-            PORTD &= (1 << PD3);
+            PORTD &= ~(1 << PD3);
         }
         if (cur_digit == 2) {
-            PORTD &= (1 << PD4);
+            PORTD &= ~(1 << PD4);
         }
 	} else {
         // turn off
