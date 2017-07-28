@@ -93,7 +93,7 @@ ISR(TIMER0_OVF_vect) {
 	TCNT0 = 250;
 
 	pwm_iter++;
-	if (pwm_iter == 8) {
+	if (pwm_iter == 12) {
 		pwm_iter = 0;
 		cur_digit++;
 	}
@@ -346,7 +346,7 @@ void get_brightness_from_user() {
 	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { // wait for hours
 		delay_ms(DEBOUNCE_DELAY);
 		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
-			if (brightness < 7) {
+			if (brightness < 11) {
 				brightness++;
 			}
 			delay_ms(DEBOUNCE_DELAY);
