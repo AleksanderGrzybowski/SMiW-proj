@@ -34,8 +34,6 @@ void delay_ms(uint16_t count) {
 #define CONF_BUTTON_UP_PIN  PIND
 #define CONF_BUTTON_UP_NUM  2
 
-#define BRIGHTNESS_EEPROM_LOCATION 13
-
 /////////////////////////////////////////////////////
 
 #define DOT 128
@@ -53,8 +51,6 @@ char tab[26] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G), (A
 				+ B + C + E + F + G), (D + E + F), (B + C + D + E + G),
         (A+F+E+D), (B+C+D+E+F), (E+G), (E+F+G+B+C), (C+D+E)
-
-
 };
 #define LETTER_I 1
 #define LETTER_O 0
@@ -362,7 +358,6 @@ void get_brightness_from_user() {
 			delay_ms(DEBOUNCE_DELAY);
 		}
 	}
-	eeprom_write_byte((uint8_t*)BRIGHTNESS_EEPROM_LOCATION, brightness);
 	delay_ms(DEBOUNCE_DELAY);
 }
 
@@ -430,11 +425,6 @@ int main() {
 	DDRB = DDRC = DDRD = 0x00;
 	PORTB = PORTC = PORTD = 0xff;
 
-
-	brightness = eeprom_read_byte((uint8_t*)BRIGHTNESS_EEPROM_LOCATION);
-	if (!(brightness >= 1 && brightness <= 7)) {
-		brightness = 3;
-	}
 
 	/* enable timer overflow interrupts for PWM */
 	TIMSK |= (1 << TOIE0);
