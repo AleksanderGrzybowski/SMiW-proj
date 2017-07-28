@@ -439,7 +439,7 @@ int main() {
 	/* enable timer overflow interrupts for PWM */
 	TIMSK |= (1 << TOIE0);
 	/* set prescaler, selected by experimenting, but works perfectly */
-	TCCR0 &= (1 << CS02);
+	TCCR0 &= ~(1 << CS02);
 	TCCR0 |= (1 << CS01);
 	TCCR0 |= (1 << CS00);
 	/* not sure if needed TODO */
