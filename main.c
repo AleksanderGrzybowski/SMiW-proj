@@ -46,12 +46,16 @@ void delay_ms(uint16_t count) {
 #define C 4
 #define B 2
 #define A 1
-char tab[21] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
+char tab[26] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G + C + D), (F + G + B + C), (A + F + G + C + D), (A + F + G + E + D
 		+ C), (F + A + B + C), (A + B + C + D + E + F + G), (A + B + C + D + F
 		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
 		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G), (A
-				+ B + C + E + F + G), (D + E + F), (B + C + D + E + G) };
+				+ B + C + E + F + G), (D + E + F), (B + C + D + E + G),
+        (A+F+E+D), (B+C+D+E+F), (E+G), (E+F+G+B+C)
+
+
+};
 #define LETTER_I 1
 #define LETTER_O 0
 #define DASH 10
@@ -66,6 +70,13 @@ char tab[21] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_A 18
 #define LETTER_L 19
 #define LETTER_D 20
+
+#define LETTER_C 21
+#define LETTER_U 22
+#define LETTER_R 23
+#define LETTER_H 24
+
+volatile uint16_t battery_alarm_threshold = 380;
 
 /* variables for display */
 volatile char display[4]; // 4 digits, dot handled below
@@ -177,6 +188,48 @@ ISR(TIMER0_OVF_vect) {
 
 }
 
+void adc_init()
+{
+    // AREF = AVcc
+    ADMUX = (1<<REFS0);
+ 
+    // ADC Enable and prescaler of 128
+    // 16000000/128 = 125000
+    ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);
+}
+
+uint16_t adc_read(uint8_t ch)
+{
+  // select the corresponding channel 0~7
+  // ANDing with ’7′ will always keep the value
+  // of ‘ch’ between 0 and 7
+  ch &= 0b00000111;  // AND operation with 7
+  ADMUX = (ADMUX & 0xF8)|ch; // clears the bottom 3 bits before ORing
+ 
+  // start single convertion
+  // write ’1′ to ADSC
+  ADCSRA |= (1<<ADSC);
+ 
+  // wait for conversion to complete
+  // ADSC becomes ’0′ again
+  // till then, run loop continuously
+  while(ADCSRA & (1<<ADSC));
+ 
+  return (ADC);
+}
+
+uint16_t current_battery_voltage() { // if 3.8V -> 380
+    int i;
+    uint16_t read = 0;
+    for (i = 0; i < 50; ++i) {
+        read += adc_read(3);
+        _delay_ms(10);
+    }
+    float battery_mv = 0.02 * 5.0 * read * 1000.0 / 1024.0;
+    uint16_t battery_mv_int = (uint16_t)battery_mv;
+    return battery_mv_int/10;
+}
+
 /* set display's digits, each digit separately, useful for debugging and used by other funcs */
 void set_display_each_digit(int dig0, int dig1, int dig2, int dig3, int dot) {
 	display[0] = dig0;
@@ -211,7 +264,7 @@ void set_display_two_digits(int left, int right, int dot) {
 }
 
 /* set display's digits, one number in range <0.9999>, great for debug */
-void set_display_whole_number(int number) {
+void set_display_whole_number(int number, int dot) {
 	int d3 = number % 10;
 	number /= 10;
 	int d2 = number % 10;
@@ -219,7 +272,7 @@ void set_display_whole_number(int number) {
 	int d1 = number % 10;
 	number /= 10;
 	int d0 = number % 10;
-	set_display_each_digit(d0, d1, d2, d3, 0);
+	set_display_each_digit(d0 == 0 ? EMPTY_DIGIT: 0, d1, d2, d3, dot); // TODO fix this later for all cases
 }
 
 /* display current time */
@@ -312,6 +365,43 @@ void get_brightness_from_user() {
 	delay_ms(DEBOUNCE_DELAY);
 }
 
+void show_current_battery_voltage_to_user() {
+	set_display_each_digit(LETTER_C, LETTER_U, LETTER_R, LETTER_R, 0);
+    delay_ms(1000);
+
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) { 
+		delay_ms(DEBOUNCE_DELAY);
+        uint16_t current_voltage = current_battery_voltage();
+        set_display_whole_number(current_voltage, 1);
+    }
+}
+
+void get_threshold_battery_from_user() {
+	set_display_each_digit(LETTER_T, LETTER_H, LETTER_R, LETTER_S, 0);
+    delay_ms(1000);
+
+    int flip = 0;
+
+	while (CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM)) {
+		delay_ms(DEBOUNCE_DELAY);
+		if (!(CONF_BUTTON_UP_PIN & _BV(CONF_BUTTON_UP_NUM))) {
+            battery_alarm_threshold++;
+			delay_ms(DEBOUNCE_DELAY);
+		}
+		if (!(CONF_BUTTON_DOWN_PIN & _BV(CONF_BUTTON_DOWN_NUM))) {
+            battery_alarm_threshold--;
+			delay_ms(DEBOUNCE_DELAY);
+		}
+        flip = !flip;
+        if (flip) {
+        set_display_whole_number(battery_alarm_threshold, 1);
+        } else {
+            set_display_two_digits(-1, -1, 1);
+        }
+	}
+    delay_ms(DEBOUNCE_DELAY);
+}
+
 /* ask user for time and set it as current time */
 void set_time() {
 	uint8_t dummy;
@@ -326,6 +416,7 @@ void set_time() {
 	get_time_from_user(hour, minute, &new_hour, &new_minute);
 	ds1307_setdate(1, 1, 1, new_hour, new_minute, 0);
 }
+
 
 
 int main() {
@@ -379,6 +470,12 @@ int main() {
 	CONF_BUTTON_DOWN_PORT |= _BV(CONF_BUTTON_DOWN_NUM);
 
 
+    DDRC &= ~(1 << PC3);
+    PORTC &= ~(1 << PC3);
+    adc_init();
+    //while(1) {
+    //}
+
 	/* start RTC and check if it ticks
 	 * if battery is empty then it won't start and will be stuck at 0:00:00
 	 * to force start, simply set any hour
@@ -403,6 +500,8 @@ int main() {
 		if (!(CONF_BUTTON_SETTIME_PIN & _BV(CONF_BUTTON_SETTIME_NUM))) {
 			set_time();
 			get_brightness_from_user();
+			show_current_battery_voltage_to_user();
+			get_threshold_battery_from_user();
 		}
 	}
 }
