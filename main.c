@@ -52,7 +52,7 @@ char tab[26] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 		+ G), (B), (0), (A + C + D + F + G), (A + D + E + F + G),
 		(D + E + F + G), (A + B + E + F + G), (C + E + G), (A + E + F + G), (A
 				+ B + C + E + F + G), (D + E + F), (B + C + D + E + G),
-        (A+F+E+D), (B+C+D+E+F), (E+G), (E+F+G+B+C)
+        (A+F+E+D), (B+C+D+E+F), (E+G), (E+F+G+B+C), (C+D+E)
 
 
 };
@@ -75,6 +75,7 @@ char tab[26] = { (A + B + C + D + E + F), (B + C), (A + B + G + E + D), (A + B
 #define LETTER_U 22
 #define LETTER_R 23
 #define LETTER_H 24
+#define LETTER_W 25
 
 volatile uint16_t battery_alarm_threshold = 380;
 
@@ -490,8 +491,9 @@ int main() {
 	}
 
 
-#define UPDATE_INTERVAL_TIME 100
+#define UPDATE_INTERVAL_TIME 200
 
+    uint16_t battery_check_counter = 0;
 	/* main loop of the program */
 	while (1) {
 		disp_time();
@@ -503,5 +505,14 @@ int main() {
 			show_current_battery_voltage_to_user();
 			get_threshold_battery_from_user();
 		}
+
+        battery_check_counter++;
+        if (battery_check_counter == 5 * 60 * 30) {
+            battery_check_counter = 0;
+            if (current_battery_voltage() < battery_alarm_threshold) {
+                set_display_each_digit(LETTER_L, 0, LETTER_W, EMPTY_DIGIT, 0);
+                delay_ms(10000);
+            }
+        }
 	}
 }
