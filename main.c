@@ -501,7 +501,7 @@ int main() {
             battery_check_counter = 0;
             if (current_battery_voltage() < battery_alarm_threshold) {
                 set_display_each_digit(LETTER_L, 0, LETTER_W, EMPTY_DIGIT, 0);
-                delay_ms(10000);
+                delay_ms(1000 * 60 * 5);
             }
         }
 	}
